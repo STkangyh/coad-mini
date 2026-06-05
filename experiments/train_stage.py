@@ -12,14 +12,17 @@ Stage3: Moving up / down / toward cam / away cam
 Stage4: Pushing L→R / R→L / Pulling L→R / R→L   ← Stage3과 유사
 """
 
+import sys
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
+
 import torch
 import torch.nn as nn
 import numpy as np
 from pathlib import Path
 
-from utils.orthogonal_grad import OrthogonalGradient
-from utils.gem import AGEM
-from trainer import (
+from src.utils.orthogonal_grad import OrthogonalGradient
+from src.utils.gem import AGEM
+from src.trainer import (
     load_samples, make_model, set_seed,
     train_epoch,
     TRAIN_FEAT_DIR, VAL_FEAT_DIR,

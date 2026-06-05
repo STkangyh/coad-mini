@@ -10,14 +10,17 @@ Multi-seed Stage Forgetting 실험
 클래스 구조: 8 stages × 6 classes = 48
 """
 
+import sys
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
+
 import torch
 import torch.nn as nn
 import numpy as np
 from pathlib import Path
 
-from utils.gem import AGEM
-from models.gru_detector import GRUDetector
-from trainer import (
+from src.utils.gem import AGEM
+from src.models.gru_detector import GRUDetector
+from src.trainer import (
     load_samples, set_seed,
     train_epoch,
     TRAIN_FEAT_DIR, VAL_FEAT_DIR,

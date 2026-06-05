@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 
-from models.gru_detector import GRUDetector
+from src.models.gru_detector import GRUDetector
 from config import FEATURE_DIM, NUM_CLASSES
 
 TRAIN_FEAT_DIR = Path("data/features/train")

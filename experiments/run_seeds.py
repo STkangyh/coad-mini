@@ -3,12 +3,16 @@ Baseline vs COAD  ×  N seeds 반복 실험
 결과를 mean ± std로 출력
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import torch
 import torch.nn as nn
 import numpy as np
 
-from utils.orthogonal_grad import OrthogonalGradient
-from trainer import (
+from src.utils.orthogonal_grad import OrthogonalGradient
+from src.trainer import (
     load_samples, make_model, set_seed,
     train_epoch, evaluate,
     TRAIN_FEAT_DIR, VAL_FEAT_DIR,

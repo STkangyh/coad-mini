@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from models.gru_detector import GRUDetector
+from src.models.gru_detector import GRUDetector
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
 CKPT_DIR    = Path("checkpoints")

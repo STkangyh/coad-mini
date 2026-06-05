@@ -28,22 +28,28 @@ Current default setup:
 coad-mini/
 ├── app.py                      # FastAPI demo server
 ├── config.py                   # Shared constants and path configuration
-├── trainer.py                  # Shared train/eval loops
-├── train_baseline.py           # Single-pass baseline training
-├── train_coad.py               # Older orthogonal-gradient experiment
-├── train_stage.py              # Stage-based continual learning comparison
-├── run_seeds.py                # Multi-seed baseline vs OrthGrad
-├── run_stage_seeds.py          # Multi-seed baseline vs A-GEM
-├── run_analysis.py             # A-GEM replay/memory ablations
-├── save_checkpoints.py         # Train and save Baseline/A-GEM checkpoints
-├── models/
-│   └── gru_detector.py
-├── utils/
-│   ├── gem.py
-│   └── orthogonal_grad.py
-├── scripts/
+├── experiments/                # Training and analysis scripts
+│   ├── train_baseline.py       # Single-pass baseline training
+│   ├── train_coad.py           # Older orthogonal-gradient experiment
+│   ├── train_stage.py          # Stage-based continual learning comparison
+│   ├── run_seeds.py            # Multi-seed baseline vs OrthGrad
+│   ├── run_stage_seeds.py      # Multi-seed baseline vs A-GEM
+│   ├── run_analysis.py         # A-GEM replay/memory ablations
+│   └── save_checkpoints.py     # Train and save Baseline/A-GEM checkpoints
+├── src/                        # Core library code
+│   ├── models/
+│   │   └── gru_detector.py
+│   ├── utils/
+│   │   ├── gem.py
+│   │   └── orthogonal_grad.py
+│   └── trainer.py              # Shared train/eval loops
+├── scripts/                    # Data preparation
+│   ├── make_subset.py
 │   ├── create_mini_subset.py
 │   └── extract_clip_features.py
+├── dev/                        # Development utilities
+│   ├── make_dummy_data.py
+│   └── make_pattern_data.py
 ├── checkpoints/
 │   ├── baseline_48cls.pt
 │   ├── agem_48cls.pt
@@ -99,7 +105,7 @@ Endpoints:
 ### 2. Recreate the mini subset manifests
 
 ```bash
-python3 make_subset.py
+python3 scripts/make_subset.py
 python3 scripts/create_mini_subset.py
 ```
 
@@ -112,6 +118,20 @@ python3 scripts/extract_clip_features.py
 This writes per-video features under `data/features/{train,val}`.
 
 ### 4. Run experiments
+
+```bash
+# Simple baseline run
+python3 experiments/train_baseline.py
+
+# Stage-based continual learning
+python3 experiments/train_stage.py
+
+# Multi-seed comparison
+python3 experiments/run_stage_seeds.py
+
+# Save checkpoints for demo
+python3 experiments/save_checkpoints.py
+```
 
 ```bash
 python3 train_baseline.py

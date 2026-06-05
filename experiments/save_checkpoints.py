@@ -11,15 +11,18 @@ Baseline과 A-GEM(best config: ratio=0.25, balanced) 모델을 각각
     class_labels.json    — class_id → label 문자열
 """
 
+import sys
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
+
 import json
 import torch
 import torch.nn as nn
 import numpy as np
 from pathlib import Path
 
-from utils.gem import AGEM
-from models.gru_detector import GRUDetector
-from trainer import (
+from src.utils.gem import AGEM
+from src.models.gru_detector import GRUDetector
+from src.trainer import (
     load_samples, set_seed,
     train_epoch,
     TRAIN_FEAT_DIR, VAL_FEAT_DIR,
