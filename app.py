@@ -401,6 +401,11 @@ HTML_PAGE = """<!DOCTYPE html>
   .stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
   .stat { font-size: 0.82rem; color: #8b949e; }
   .stat span { color: #e6edf3; font-weight: 600; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
@@ -427,27 +432,33 @@ HTML_PAGE = """<!DOCTYPE html>
          overflow:hidden;background:#000;position:relative;user-select:none">
       <video id="videoPreview" controls playsinline
              style="width:100%;max-height:340px;display:block;object-fit:contain"></video>
-      <!-- 자막 오버레이 -->
-      <div id="subtitleOverlay" style="display:none;position:absolute;bottom:48px;left:0;right:0;
-           pointer-events:none;padding:0 12px">
-        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-          <div id="subBaseline" style="background:rgba(248,81,73,0.88);color:#fff;
-               border-radius:6px;padding:5px 12px;font-size:0.82rem;font-weight:600;
-               backdrop-filter:blur(4px);max-width:48%;text-align:center;line-height:1.3">
-            <div style="font-size:0.68rem;opacity:0.8;margin-bottom:2px">Baseline</div>
+
+      <!-- ① 현재 행동 자막 (영상 위) -->
+      <div id="subtitleOverlay" style="display:none;position:absolute;bottom:52px;
+           left:0;right:0;pointer-events:none;padding:0 10px">
+        <div style="display:flex;gap:6px;justify-content:center">
+          <!-- Baseline -->
+          <div id="subBaseline" style="background:rgba(200,60,50,0.88);color:#fff;
+               border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;
+               backdrop-filter:blur(6px);max-width:46%;text-align:center;
+               transition:opacity 0.3s;line-height:1.4">
+            <div style="font-size:0.62rem;opacity:0.75;letter-spacing:.5px">BASELINE</div>
             <div id="subBaselineText">—</div>
-            <div id="subBaselineProb" style="font-size:0.68rem;opacity:0.7"></div>
+            <div id="subBaselineProb" style="font-size:0.65rem;opacity:0.7"></div>
           </div>
-          <div id="subAgem" style="background:rgba(63,185,80,0.88);color:#fff;
-               border-radius:6px;padding:5px 12px;font-size:0.82rem;font-weight:600;
-               backdrop-filter:blur(4px);max-width:48%;text-align:center;line-height:1.3">
-            <div style="font-size:0.68rem;opacity:0.8;margin-bottom:2px">A-GEM</div>
+          <!-- A-GEM -->
+          <div id="subAgem" style="background:rgba(40,160,60,0.88);color:#fff;
+               border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;
+               backdrop-filter:blur(6px);max-width:46%;text-align:center;
+               transition:opacity 0.3s;line-height:1.4">
+            <div style="font-size:0.62rem;opacity:0.75;letter-spacing:.5px">A-GEM</div>
             <div id="subAgemText">—</div>
-            <div id="subAgemProb" style="font-size:0.68rem;opacity:0.7"></div>
+            <div id="subAgemProb" style="font-size:0.65rem;opacity:0.7"></div>
           </div>
         </div>
       </div>
-      <!-- 실시간 토글 + 다시 선택 -->
+
+      <!-- 버튼 -->
       <div style="position:absolute;top:8px;right:8px;display:flex;gap:6px">
         <button id="rtBtn" onclick="toggleRT()"
                 style="background:rgba(88,166,255,0.85);color:#fff;border:none;
@@ -460,8 +471,20 @@ HTML_PAGE = """<!DOCTYPE html>
           ✕ 다시 선택
         </button>
       </div>
-      <!-- 숨겨진 캡처용 canvas -->
       <canvas id="captureCanvas" style="display:none"></canvas>
+    </div>
+
+    <!-- ② 행동 변화 타임라인 (영상 아래) -->
+    <div id="timelineWrap" style="display:none;margin-top:10px">
+      <div style="font-size:0.75rem;color:#8b949e;margin-bottom:6px;
+                  display:flex;align-items:center;gap:6px">
+        ⏱ 행동 변화 타임라인
+        <span style="font-size:0.68rem;color:#484f58">
+          (A-GEM 예측이 바뀔 때마다 기록)
+        </span>
+      </div>
+      <div id="timelineTrack" style="display:flex;gap:4px;flex-wrap:wrap;
+           max-height:90px;overflow-y:auto;align-content:flex-start"></div>
     </div>
     <button class="btn" id="predictBtn" disabled onclick="runPredict()">
       🔍 Baseline vs A-GEM 예측
@@ -489,12 +512,12 @@ HTML_PAGE = """<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 // ── 파일 선택 ─────────────────────────────────────────────────────────────────
-const fileInput    = document.getElementById('fileInput');
+const fileInput     = document.getElementById('fileInput');
 const filenameLabel = document.getElementById('filenameLabel');
-const predictBtn   = document.getElementById('predictBtn');
-const dropZone     = document.getElementById('dropZone');
-const videoWrap    = document.getElementById('videoWrap');
-const videoPreview = document.getElementById('videoPreview');
+const predictBtn    = document.getElementById('predictBtn');
+const dropZone      = document.getElementById('dropZone');
+const videoWrap     = document.getElementById('videoWrap');
+const videoPreview  = document.getElementById('videoPreview');
 
 function showVideoPreview(file) {
   const url = URL.createObjectURL(file);
@@ -514,6 +537,8 @@ function resetUpload() {
   fileInput.value = '';
   document.getElementById('resultCard').style.display = 'none';
   document.getElementById('subtitleOverlay').style.display = 'none';
+  document.getElementById('timelineWrap').style.display = 'none';
+  document.getElementById('timelineTrack').innerHTML = '';
 }
 
 fileInput.addEventListener('change', () => {
@@ -521,7 +546,9 @@ fileInput.addEventListener('change', () => {
   if (f) {
     filenameLabel.textContent = '✓ ' + f.name;
     showVideoPreview(f);
-    stopRT();  // 새 파일 선택 시 자막 초기화
+    stopRT();
+    document.getElementById('timelineTrack').innerHTML = '';
+    document.getElementById('timelineWrap').style.display = 'none';
   }
 });
 
@@ -539,15 +566,36 @@ uploadArea.addEventListener('drop', e => {
 });
 
 // ── 실시간 자막 ───────────────────────────────────────────────────────────────
-const FRAME_BUFFER_SIZE = 16;   // GRU 입력 길이
-const CAPTURE_INTERVAL  = 800;  // ms 마다 프레임 1장 캡처
-const INFER_EVERY       = 8;    // 캡처 N장마다 추론 1회
+const FRAME_BUFFER_SIZE = 16;  // GRU 슬라이딩 윈도우
+const CAPTURE_INTERVAL  = 200; // 200ms마다 캡처 (≈5fps)
+const INFER_EVERY       = 2;   // 2 캡처마다 추론 (≈400ms)
+const STABLE_WINDOW     = 3;   // 최근 N번 예측 중 최빈값으로 안정화 (떨림 방지)
 
-let rtActive      = false;
-let rtTimer       = null;
-let frameBuffer   = [];
-let captureCount  = 0;
-let inferPending  = false;
+let rtActive    = false;
+let rtTimer     = null;
+let frameBuffer = [];
+let captureCount = 0;
+let inferPending = false;
+
+// 안정화용 최근 예측 버퍼
+let predHistory = { baseline: [], agem: [] };  // 최근 STABLE_WINDOW개
+
+// 타임라인: A-GEM 예측이 바뀔 때만 기록
+let lastGemLabel = null;
+let timelineEntries = [];
+
+// 자막 색상 팔레트 (클래스 stage별)
+const STAGE_COLORS = [
+  '#c0392b','#e67e22','#f39c12','#27ae60',
+  '#16a085','#2980b9','#8e44ad','#2c3e50',
+];
+
+function stageColor(label) {
+  // label로 stage 색 추정 (간단히 해시)
+  let h = 0;
+  for (const c of label) h = (h * 31 + c.charCodeAt(0)) & 0xfffffff;
+  return STAGE_COLORS[h % STAGE_COLORS.length];
+}
 
 const captureCanvas = document.getElementById('captureCanvas');
 const captureCtx    = captureCanvas.getContext('2d');
@@ -558,11 +606,13 @@ function captureFrame() {
   captureCanvas.width  = W;
   captureCanvas.height = H;
   captureCtx.drawImage(videoPreview, 0, 0, W, H);
-  const b64 = captureCanvas.toDataURL('image/jpeg', 0.7);  // JPEG 압축으로 속도 향상
+  const b64 = captureCanvas.toDataURL('image/jpeg', 0.65);
   frameBuffer.push(b64);
   if (frameBuffer.length > FRAME_BUFFER_SIZE) frameBuffer.shift();
   captureCount++;
-  if (captureCount % INFER_EVERY === 0 && frameBuffer.length === FRAME_BUFFER_SIZE && !inferPending) {
+  if (captureCount % INFER_EVERY === 0 &&
+      frameBuffer.length === FRAME_BUFFER_SIZE &&
+      !inferPending) {
     runRT([...frameBuffer]);
   }
 }
@@ -577,41 +627,116 @@ async function runRT(frames) {
     });
     if (!res.ok) return;
     const data = await res.json();
-    updateSubtitle(data);
+    storeAndRender(data);
   } catch(_) {}
   finally { inferPending = false; }
 }
 
-function updateSubtitle(data) {
-  const overlay = document.getElementById('subtitleOverlay');
-  overlay.style.display = 'block';
+// ── 안정화: 최근 N번 중 최빈값 선택 ──────────────────────────────────────────
+function stablePred(history, newPred) {
+  history.push(newPred);
+  if (history.length > STABLE_WINDOW) history.shift();
+  const freq = {};
+  let best = null, bestN = 0;
+  for (const p of history) {
+    freq[p.label] = (freq[p.label] || 0) + 1;
+    if (freq[p.label] > bestN) { best = p; bestN = freq[p.label]; }
+  }
+  return best;
+}
 
-  const bl  = data.baseline[0];
-  const gem = data.agem[0];
+function storeAndRender(data) {
+  const rawBl  = data.baseline[0];
+  const rawGem = data.agem[0];
 
-  document.getElementById('subBaselineText').textContent = bl.label;
-  document.getElementById('subBaselineProb').textContent = (bl.prob * 100).toFixed(0) + '%';
-  document.getElementById('subAgemText').textContent     = gem.label;
-  document.getElementById('subAgemProb').textContent     = (gem.prob * 100).toFixed(0) + '%';
+  const stableBl  = stablePred(predHistory.baseline, rawBl);
+  const stableGem = stablePred(predHistory.agem,     rawGem);
+
+  updateSubtitle(stableBl, stableGem);
+
+  // 타임라인: A-GEM 예측이 바뀔 때만 항목 추가
+  if (stableGem.label !== lastGemLabel) {
+    lastGemLabel = stableGem.label;
+    const t = videoPreview.currentTime.toFixed(1);
+    addTimelineEntry(t, stableBl, stableGem);
+  }
+}
+
+// ── 자막 업데이트 (페이드 효과) ───────────────────────────────────────────────
+function updateSubtitle(bl, gem) {
+  document.getElementById('subtitleOverlay').style.display = 'block';
+
+  const blText  = document.getElementById('subBaselineText');
+  const blProb  = document.getElementById('subBaselineProb');
+  const gemText = document.getElementById('subAgemText');
+  const gemProb = document.getElementById('subAgemProb');
+
+  // 바뀐 경우에만 페이드 처리
+  if (blText.textContent !== bl.label) {
+    flashElement(document.getElementById('subBaseline'));
+    blText.textContent = bl.label;
+  }
+  if (gemText.textContent !== gem.label) {
+    flashElement(document.getElementById('subAgem'));
+    gemText.textContent = gem.label;
+  }
+  blProb.textContent  = (bl.prob  * 100).toFixed(0) + '%';
+  gemProb.textContent = (gem.prob * 100).toFixed(0) + '%';
+}
+
+function flashElement(el) {
+  el.style.opacity = '0.3';
+  el.style.transform = 'scale(0.97)';
+  el.style.transition = 'opacity 0.25s, transform 0.25s';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'scale(1)';
+  }));
+}
+
+// ── 타임라인 항목 추가 ─────────────────────────────────────────────────────────
+function addTimelineEntry(t, bl, gem) {
+  const track = document.getElementById('timelineTrack');
+  const div   = document.createElement('div');
+  div.style.cssText = `
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 4px 8px; font-size: 0.72rem; min-width: 90px;
+    border-left: 3px solid ${stageColor(gem.label)};
+    animation: fadeIn 0.3s ease;
+  `;
+  div.innerHTML = `
+    <div style="color:#8b949e;font-size:0.62rem">⏱ ${t}s</div>
+    <div style="color:#3fb950;font-weight:600;line-height:1.3;margin-top:1px">
+      ${gem.label}
+    </div>
+    <div style="color:#f85149;font-size:0.65rem;margin-top:1px">
+      BL: ${bl.label}
+    </div>
+  `;
+  track.appendChild(div);
+  track.scrollTop = track.scrollHeight;
+  // 최대 50개 유지
+  while (track.children.length > 50) track.removeChild(track.firstChild);
 }
 
 function toggleRT() {
-  if (rtActive) {
-    stopRT();
-  } else {
-    startRT();
-  }
+  rtActive ? stopRT() : startRT();
 }
 
 function startRT() {
   if (rtActive) return;
-  rtActive     = true;
-  frameBuffer  = [];
-  captureCount = 0;
-  inferPending = false;
+  rtActive       = true;
+  frameBuffer    = [];
+  captureCount   = 0;
+  inferPending   = false;
+  predHistory    = { baseline: [], agem: [] };
+  lastGemLabel   = null;
+
   document.getElementById('rtBtn').textContent = '⏹ 자막 중지';
   document.getElementById('rtBtn').style.background = 'rgba(248,81,73,0.85)';
   document.getElementById('subtitleOverlay').style.display = 'block';
+  document.getElementById('timelineWrap').style.display = 'block';
+
   videoPreview.play().catch(()=>{});
   rtTimer = setInterval(captureFrame, CAPTURE_INTERVAL);
 }
@@ -619,7 +744,7 @@ function startRT() {
 function stopRT() {
   rtActive = false;
   clearInterval(rtTimer);
-  rtTimer = null;
+  rtTimer  = null;
   const btn = document.getElementById('rtBtn');
   if (btn) {
     btn.textContent = '▶ 실시간 자막';
@@ -627,7 +752,6 @@ function stopRT() {
   }
 }
 
-// 영상 끝나면 자동 중지
 videoPreview.addEventListener('ended', stopRT);
 videoPreview.addEventListener('pause', () => { if (rtActive) stopRT(); });
 
