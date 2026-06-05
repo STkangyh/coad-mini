@@ -1,0 +1,18 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local experiment artifacts
+data/features/
+data/features.npy
+data/labels.npy
+data/subset/*_subset.csv
+data/subset/*_subset.json
+data/subset/validation_subset.csv
+data/subset/validation_subset.json
+
+# Python / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

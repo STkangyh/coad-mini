@@ -1,0 +1,530 @@
+{
+  "0": {
+    "template": "Opening [something]",
+    "label": "Opening book",
+    "examples": [
+      "book",
+      "door",
+      "jar",
+      "a lotion",
+      "box"
+    ]
+  },
+  "1": {
+    "template": "Closing [something]",
+    "label": "Closing drawer",
+    "examples": [
+      "drawer",
+      "a box",
+      "door",
+      "book",
+      "box"
+    ]
+  },
+  "2": {
+    "template": "Turning [something] upside down",
+    "label": "Turning remote upside down",
+    "examples": [
+      "remote",
+      "cup",
+      "video cd",
+      "glass",
+      "a bottle"
+    ]
+  },
+  "3": {
+    "template": "Putting [something] onto [something]",
+    "label": "Putting pen onto pen",
+    "examples": [
+      "pen",
+      "bottle",
+      "eraser",
+      "plate",
+      "battery"
+    ]
+  },
+  "4": {
+    "template": "Folding [something]",
+    "label": "Folding paper",
+    "examples": [
+      "paper",
+      "towel",
+      "sock",
+      "newspaper",
+      "a paper"
+    ]
+  },
+  "5": {
+    "template": "Picking [something] up",
+    "label": "Picking bottle up",
+    "examples": [
+      "bottle",
+      "cup",
+      "phone",
+      "keys",
+      "a marker"
+    ]
+  },
+  "6": {
+    "template": "Putting [something] into [something]",
+    "label": "Putting spoon into spoon",
+    "examples": [
+      "spoon",
+      "brush",
+      "pen",
+      "a spoon",
+      "a knife"
+    ]
+  },
+  "7": {
+    "template": "Taking [something] out of [something]",
+    "label": "Taking a spoon out of a spoon",
+    "examples": [
+      "a spoon",
+      "spoon",
+      "a mobile phone",
+      "pencil",
+      "pen drive"
+    ]
+  },
+  "8": {
+    "template": "Putting [something] on a surface",
+    "label": "Putting pen on a surface",
+    "examples": [
+      "pen",
+      "color pencils",
+      "bottle",
+      "smartphone",
+      "mobile"
+    ]
+  },
+  "9": {
+    "template": "Taking [something] from [somewhere]",
+    "label": "Taking box from somewhere",
+    "examples": [
+      "box",
+      "cup",
+      "vessel",
+      "a notebook",
+      "a calculator"
+    ]
+  },
+  "10": {
+    "template": "Stuffing [something] into [something]",
+    "label": "Stuffing remote into remote",
+    "examples": [
+      "remote",
+      "pen",
+      "card",
+      "pencil",
+      "paper towel"
+    ]
+  },
+  "11": {
+    "template": "Putting [something] next to [something]",
+    "label": "Putting pen next to pen",
+    "examples": [
+      "pen",
+      "a pencil",
+      "battery",
+      "comb",
+      "brush"
+    ]
+  },
+  "12": {
+    "template": "Moving [something] up",
+    "label": "Moving pen up",
+    "examples": [
+      "pen",
+      "remote",
+      "something",
+      "color pencils",
+      "keys"
+    ]
+  },
+  "13": {
+    "template": "Moving [something] down",
+    "label": "Moving color pencils down",
+    "examples": [
+      "color pencils",
+      "something",
+      "scissors",
+      "pen",
+      "book"
+    ]
+  },
+  "14": {
+    "template": "Moving [something] towards the camera",
+    "label": "Moving toy towards the camera",
+    "examples": [
+      "toy",
+      "cup",
+      "toothpaste",
+      "book",
+      "trigonal clip"
+    ]
+  },
+  "15": {
+    "template": "Moving [something] away from the camera",
+    "label": "Moving toy away from the camera",
+    "examples": [
+      "toy",
+      "bottle",
+      "sponge",
+      "pen",
+      "a cell phone"
+    ]
+  },
+  "16": {
+    "template": "Moving [something] and [something] closer to each other",
+    "label": "Moving glass and glass closer to each other",
+    "examples": [
+      "glass",
+      "toy",
+      "battery",
+      "perfume",
+      "cup"
+    ]
+  },
+  "17": {
+    "template": "Moving [something] and [something] away from each other",
+    "label": "Moving cup and cup away from each other",
+    "examples": [
+      "cup",
+      "toy",
+      "paper puncher",
+      "tv box",
+      "remote"
+    ]
+  },
+  "18": {
+    "template": "Pushing [something] from left to right",
+    "label": "Pushing color pencils from left to right",
+    "examples": [
+      "color pencils",
+      "remote",
+      "box",
+      "knife",
+      "longnose"
+    ]
+  },
+  "19": {
+    "template": "Pushing [something] from right to left",
+    "label": "Pushing color pencils from right to left",
+    "examples": [
+      "color pencils",
+      "paper",
+      "shoe",
+      "taskpane",
+      "marker"
+    ]
+  },
+  "20": {
+    "template": "Pulling [something] from left to right",
+    "label": "Pulling mobile box from left to right",
+    "examples": [
+      "mobile box",
+      "scissors",
+      "color pencils",
+      "eye pencil",
+      "jar"
+    ]
+  },
+  "21": {
+    "template": "Pulling [something] from right to left",
+    "label": "Pulling bottle from right to left",
+    "examples": [
+      "bottle",
+      "book",
+      "cork",
+      "keys",
+      "a scissor"
+    ]
+  },
+  "22": {
+    "template": "Pushing [something] with [something]",
+    "label": "Pushing eraser with eraser",
+    "examples": [
+      "eraser",
+      "glass",
+      "cup",
+      "perfume",
+      "pencil"
+    ]
+  },
+  "23": {
+    "template": "Poking [something] so lightly that it doesn't or almost doesn't move",
+    "label": "Poking color pencils so lightly that it doesn't or almost doesn't move",
+    "examples": [
+      "color pencils",
+      "a light switch",
+      "adapter",
+      "mug",
+      "bottle"
+    ]
+  },
+  "24": {
+    "template": "Covering [something] with [something]",
+    "label": "Covering color pencils with color pencils",
+    "examples": [
+      "color pencils",
+      "pencil",
+      "bottle",
+      "crayon",
+      "a bowl"
+    ]
+  },
+  "25": {
+    "template": "Uncovering [something]",
+    "label": "Uncovering color pencils",
+    "examples": [
+      "color pencils",
+      "bottle",
+      "crayon",
+      "card",
+      "pencil"
+    ]
+  },
+  "26": {
+    "template": "Throwing [something]",
+    "label": "Throwing color pencils",
+    "examples": [
+      "color pencils",
+      "paper",
+      "book",
+      "a ball",
+      "wallet"
+    ]
+  },
+  "27": {
+    "template": "Squeezing [something]",
+    "label": "Squeezing paper",
+    "examples": [
+      "paper",
+      "plastic bag",
+      "gloves",
+      "plastic",
+      "cover"
+    ]
+  },
+  "28": {
+    "template": "Throwing [something] against [something]",
+    "label": "Throwing wallet against wallet",
+    "examples": [
+      "wallet",
+      "ball",
+      "bottle",
+      "remote",
+      "book"
+    ]
+  },
+  "29": {
+    "template": "Dropping [something] onto [something]",
+    "label": "Dropping pen onto pen",
+    "examples": [
+      "pen",
+      "coin",
+      "key",
+      "brush",
+      "cup"
+    ]
+  },
+  "30": {
+    "template": "Pushing [something] so that it slightly moves",
+    "label": "Pushing knife so that it slightly moves",
+    "examples": [
+      "knife",
+      "a container",
+      "perfume",
+      "remote",
+      "a cup"
+    ]
+  },
+  "31": {
+    "template": "Pushing [something] so that it falls off the table",
+    "label": "Pushing candle so that it falls off the table",
+    "examples": [
+      "candle",
+      "cap",
+      "ball",
+      "packet",
+      "a pen"
+    ]
+  },
+  "32": {
+    "template": "Hitting [something] with [something]",
+    "label": "Hitting remote with remote",
+    "examples": [
+      "remote",
+      "watch",
+      "ball",
+      "tissue box",
+      "a bag"
+    ]
+  },
+  "33": {
+    "template": "Tearing [something] into two pieces",
+    "label": "Tearing paper into two pieces",
+    "examples": [
+      "paper",
+      "a piece of paper",
+      "a paper",
+      "paper sheet",
+      "tissue"
+    ]
+  },
+  "34": {
+    "template": "Poking [something] so it slightly moves",
+    "label": "Poking a coin so it slightly moves",
+    "examples": [
+      "a coin",
+      "plastic bottle",
+      "a pressed powder",
+      "box",
+      "a lipstick"
+    ]
+  },
+  "35": {
+    "template": "Tearing [something] just a little bit",
+    "label": "Tearing paper just a little bit",
+    "examples": [
+      "paper",
+      "a paper",
+      "a piece of paper",
+      "tissue",
+      "leaf"
+    ]
+  },
+  "36": {
+    "template": "Lifting [something] up completely without letting it drop down",
+    "label": "Lifting pencil up completely without letting it drop down",
+    "examples": [
+      "pencil",
+      "card",
+      "crayon",
+      "water bottle",
+      "toothpaste"
+    ]
+  },
+  "37": {
+    "template": "Lifting up one end of [something], then letting it drop down",
+    "label": "Lifting up one end of card, then letting it drop down",
+    "examples": [
+      "card",
+      "pencil",
+      "crayon",
+      "spoon",
+      "box"
+    ]
+  },
+  "38": {
+    "template": "Lifting [something] up completely, then letting it drop down",
+    "label": "Lifting pencil up completely, then letting it drop down",
+    "examples": [
+      "pencil",
+      "crayon",
+      "card",
+      "color pencils",
+      "tape"
+    ]
+  },
+  "39": {
+    "template": "Lifting up one end of [something] without letting it drop down",
+    "label": "Lifting up one end of pencil without letting it drop down",
+    "examples": [
+      "pencil",
+      "card",
+      "crayon",
+      "ruler",
+      "book"
+    ]
+  },
+  "40": {
+    "template": "Lifting [something] with [something] on it",
+    "label": "Lifting a book with a book on it",
+    "examples": [
+      "a book",
+      "book",
+      "wallet",
+      "box",
+      "a plate"
+    ]
+  },
+  "41": {
+    "template": "[Something] falling like a rock",
+    "label": "[Something] falling like a rock",
+    "examples": [
+      "keys",
+      "remote",
+      "pen",
+      "wallet",
+      "box"
+    ]
+  },
+  "42": {
+    "template": "Pretending to open [something] without actually opening it",
+    "label": "Pretending to open a gate without actually opening it",
+    "examples": [
+      "a gate",
+      "box",
+      "a car door",
+      "a door",
+      "door"
+    ]
+  },
+  "43": {
+    "template": "Pretending to pick [something] up",
+    "label": "Pretending to pick purse up",
+    "examples": [
+      "purse",
+      "pen",
+      "glass",
+      "a towel",
+      "phone"
+    ]
+  },
+  "44": {
+    "template": "Pretending to put [something] on a surface",
+    "label": "Pretending to put glass on a surface",
+    "examples": [
+      "glass",
+      "brush",
+      "knife",
+      "padlock",
+      "keys"
+    ]
+  },
+  "45": {
+    "template": "Showing that [something] is empty",
+    "label": "Showing that glass is empty",
+    "examples": [
+      "glass",
+      "cup",
+      "box",
+      "plate",
+      "plastic container"
+    ]
+  },
+  "46": {
+    "template": "Pretending to take [something] from [somewhere]",
+    "label": "Pretending to take basket from somewhere",
+    "examples": [
+      "basket",
+      "tv remote",
+      "key",
+      "clip",
+      "box"
+    ]
+  },
+  "47": {
+    "template": "Showing that [something] is inside [something]",
+    "label": "Showing that water is inside water",
+    "examples": [
+      "water",
+      "coins",
+      "juice",
+      "switcher",
+      "spoon"
+    ]
+  }
+}
