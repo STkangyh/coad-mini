@@ -133,12 +133,16 @@ python3 experiments/run_stage_seeds.py
 python3 experiments/save_checkpoints.py
 ```
 
-```bash
-python3 train_baseline.py
-python3 train_stage.py
-python3 run_analysis.py
-python3 save_checkpoints.py
-```
+## GitHub Pages release
+
+This repository includes a GitHub Pages site under `docs/` and an automatic deployment workflow:
+
+- Workflow: `.github/workflows/pages.yml`
+- Published URL: `https://stkangyh.github.io/coad-mini/`
+
+If this is your first Pages deploy, open **Settings → Pages** in the repository and ensure:
+
+- **Source** is set to **GitHub Actions**
 
 ## Included artifacts vs ignored artifacts
 

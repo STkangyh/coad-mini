@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>coad-mini</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #60a5fa;
+      --border: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(180deg, #0b1225 0%, var(--bg) 100%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 20px 72px;
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      margin-top: 20px;
+    }
+    h1 { margin: 0 0 8px; font-size: 2rem; }
+    h2 { margin: 0 0 10px; font-size: 1.2rem; }
+    p { margin: 0 0 12px; color: var(--text); }
+    .muted { color: var(--muted); }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a:hover { text-decoration: underline; }
+    ul { margin: 0; padding-left: 20px; }
+    code {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 6px;
+      color: #bfdbfe;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>coad-mini</h1>
+    <p class="muted">Continual-learning experiments for video action recognition on a 48-class subset of Something-Something V2.</p>
+
+    <section class="card">
+      <h2>Overview</h2>
+      <p>
+        This project compares a plain sequential baseline against replay-based methods (mainly <strong>A-GEM</strong>)
+        with a CLIP + GRU pipeline:
+      </p>
+      <p><code>video → frame sampling → CLIP embeddings → GRU classifier → staged continual-learning evaluation</code></p>
+    </section>
+
+    <section class="card">
+      <h2>Project highlights</h2>
+      <ul>
+        <li>48 classes organized as 8 stages × 6 classes</li>
+        <li>Training/analysis scripts under <code>experiments/</code></li>
+        <li>FastAPI demo app for Baseline vs A-GEM inference</li>
+        <li>Included checkpoints and mini subset manifests</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Repository</h2>
+      <p>Source code and usage instructions are available on GitHub.</p>
+      <p><a href="https://github.com/STkangyh/coad-mini">View repository →</a></p>
+    </section>
+  </main>
+</body>
+</html>
