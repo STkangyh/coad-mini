@@ -2,6 +2,10 @@
 
 Compact continual-learning experiments for video action recognition on a 48-class subset of Something-Something V2. The project compares a plain sequential baseline against replay-based mitigation methods, mainly **A-GEM**, using **CLIP ViT-B/32 frame features** and a **GRU classifier**.
 
+> **📓 연구 일지 (Research Log)** — 실험 설계부터 최종 결과까지, 코드에 담기지 않은 의사결정 과정을 기록했습니다.  
+> OrthGrad 가설 → 실패 → A-GEM 전환 → Scaling → Ablation → Demo 까지의 흐름을 담고 있습니다.  
+> → **[docs/research_log.md](docs/research_log.md)**
+
 ## What this repository contains
 
 - **Training scripts** for baseline sequential learning, stage-wise continual learning, and multi-seed analysis
