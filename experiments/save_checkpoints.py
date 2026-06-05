@@ -32,6 +32,10 @@ from src.trainer import (
 SEED              = 0
 NUM_EPOCHS        = 15
 FEATURE_DIM       = 512
+HIDDEN_DIM        = 256
+GRU_NUM_LAYERS    = 1
+GRU_DROPOUT       = 0.0
+GRU_BIDIRECTIONAL = False
 N_CLASSES         = 48
 CLASSES_PER_STAGE = 6
 MEM_PER_STAGE     = 50
@@ -123,8 +127,11 @@ def filter_by(samples, class_ids):
 def make_model():
     return GRUDetector(
         feature_dim=FEATURE_DIM,
-        hidden_dim=256,
+        hidden_dim=HIDDEN_DIM,
         num_classes=N_CLASSES,
+        num_layers=GRU_NUM_LAYERS,
+        dropout=GRU_DROPOUT,
+        bidirectional=GRU_BIDIRECTIONAL,
     ).to(device)
 
 @torch.no_grad()
@@ -180,7 +187,7 @@ def train_stages(method: str, gem=None):
               + "  ".join(f"s{k}={v:.2f}" for k, v in per_stage.items()))
 
         if gem is not None:
-            gem.add_stage(stage_train, TRAIN_FEAT_DIR)
+            gem.add_stage(stage_train, TRAIN_FEAT_DIR, model=model, device=device)
 
     return model, acc_snapshot
 
@@ -203,7 +210,10 @@ torch.save({
     "state_dict":  bl_model.state_dict(),
     "n_classes":   N_CLASSES,
     "feature_dim": FEATURE_DIM,
-    "hidden_dim":  256,
+    "hidden_dim":  HIDDEN_DIM,
+    "num_layers":  GRU_NUM_LAYERS,
+    "dropout":     GRU_DROPOUT,
+    "bidirectional": GRU_BIDIRECTIONAL,
     "avg_acc":     bl_avg,
     "s1_drop":     bl_s1drop,
     "acc_table":   bl_acc,
@@ -231,7 +241,10 @@ torch.save({
     "state_dict":    gem_model.state_dict(),
     "n_classes":     N_CLASSES,
     "feature_dim":   FEATURE_DIM,
-    "hidden_dim":    256,
+    "hidden_dim":    HIDDEN_DIM,
+    "num_layers":    GRU_NUM_LAYERS,
+    "dropout":       GRU_DROPOUT,
+    "bidirectional": GRU_BIDIRECTIONAL,
     "avg_acc":       gem_avg,
     "s1_drop":       gem_s1drop,
     "acc_table":     gem_acc,

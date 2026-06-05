@@ -26,12 +26,15 @@ class AGEM:
     def __init__(
         self,
         mem_per_stage: int = 30,
-        selection: str = "random",   # "random" | "balanced"
+        selection: str = "random",   # "random" | "balanced" | "reservoir" | "hard" | "balanced_hard"
         replay_ratio: float = 1.0,   # fraction of memory used for g_ref (0 < r ≤ 1)
     ):
         """
         mem_per_stage : 각 stage에서 메모리에 저장할 샘플 수
         selection     : "random" (무작위) | "balanced" (클래스별 균등)
+                        | "reservoir" (streaming uniform)
+                        | "hard" (loss 상위 샘플)
+                        | "balanced_hard" (클래스별 loss 상위 샘플)
         replay_ratio  : g_ref 계산 시 사용할 메모리 비율 (0 < r ≤ 1)
         """
         self.mem_per_stage = mem_per_stage
@@ -42,10 +45,22 @@ class AGEM:
         self._g_ref: torch.Tensor | None = None   # epoch당 1회 캐싱
 
     # ── stage 종료 시 호출 ───────────────────────────────────────────────────
-    def add_stage(self, samples: list, feat_dir: Path):
+    def add_stage(
+        self,
+        samples: list,
+        feat_dir: Path,
+        model: nn.Module | None = None,
+        device: str | None = None,
+    ):
         """현재 stage 샘플 중 mem_per_stage개를 메모리에 저장 (selection 전략 적용)"""
         if self.selection == "balanced":
             chosen = self._balanced_sample(samples, self.mem_per_stage)
+        elif self.selection == "reservoir":
+            chosen = self._reservoir_sample(samples, self.mem_per_stage)
+        elif self.selection == "hard":
+            chosen = self._hard_sample(samples, feat_dir, self.mem_per_stage, model, device)
+        elif self.selection == "balanced_hard":
+            chosen = self._balanced_hard_sample(samples, feat_dir, self.mem_per_stage, model, device)
         else:
             chosen = random.sample(samples, min(self.mem_per_stage, len(samples)))
         self._memory.append((chosen, Path(feat_dir)))
@@ -66,6 +81,109 @@ class AGEM:
         if len(chosen) < total:
             pool = [s for s in samples if s not in chosen]
             chosen.extend(random.sample(pool, min(total - len(chosen), len(pool))))
+        return chosen[:total]
+
+    def _reservoir_sample(self, samples: list, total: int) -> list:
+        """순차 스트림에서 uniform하게 total개 유지"""
+        reservoir = []
+        for i, sample in enumerate(samples):
+            if len(reservoir) < total:
+                reservoir.append(sample)
+                continue
+            j = random.randint(0, i)
+            if j < total:
+                reservoir[j] = sample
+        return reservoir
+
+    @torch.no_grad()
+    def _score_losses(
+        self,
+        samples: list,
+        feat_dir: Path,
+        model: nn.Module | None,
+        device: str | None,
+    ) -> list[tuple[float, dict]]:
+        """현재 모델 기준 loss를 계산해 hard-example selection에 사용"""
+        if model is None or device is None:
+            raise ValueError(
+                f"AGEM(selection={self.selection!r}) requires model and device in add_stage()."
+            )
+
+        was_training = model.training
+        model.eval()
+        scored = []
+        feat_dir = Path(feat_dir)
+
+        for s in samples:
+            feat_path = feat_dir / f"{s['id']}.npy"
+            if not feat_path.exists():
+                continue
+            feat = np.load(feat_path)
+            x = torch.tensor(feat, dtype=torch.float32).unsqueeze(0).to(device)
+            label = torch.tensor([s["class_id"]], dtype=torch.long).to(device)
+            logits, _ = model(x, None)
+            loss = self._criterion(logits, label)
+            scored.append((float(loss.item()), s))
+
+        if was_training:
+            model.train()
+        return scored
+
+    def _hard_sample(
+        self,
+        samples: list,
+        feat_dir: Path,
+        total: int,
+        model: nn.Module | None,
+        device: str | None,
+    ) -> list:
+        """전체 stage에서 loss가 큰 샘플 우선 저장"""
+        scored = self._score_losses(samples, feat_dir, model, device)
+        if not scored:
+            return random.sample(samples, min(total, len(samples)))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [sample for _, sample in scored[:total]]
+
+    def _balanced_hard_sample(
+        self,
+        samples: list,
+        feat_dir: Path,
+        total: int,
+        model: nn.Module | None,
+        device: str | None,
+    ) -> list:
+        """클래스별로 loss가 큰 샘플을 우선 저장하고 부족분은 hard 순위로 채움"""
+        from collections import defaultdict
+
+        scored = self._score_losses(samples, feat_dir, model, device)
+        if not scored:
+            return self._balanced_sample(samples, total)
+
+        buckets: dict[int, list[tuple[float, dict]]] = defaultdict(list)
+        for loss, sample in scored:
+            buckets[sample["class_id"]].append((loss, sample))
+
+        n_cls = len(buckets)
+        per_cls = max(1, total // n_cls)
+        chosen = []
+        chosen_ids = set()
+
+        for cls_samples in buckets.values():
+            cls_samples.sort(key=lambda item: item[0], reverse=True)
+            for _, sample in cls_samples[:per_cls]:
+                chosen.append(sample)
+                chosen_ids.add(sample["id"])
+
+        if len(chosen) < total:
+            scored.sort(key=lambda item: item[0], reverse=True)
+            for _, sample in scored:
+                if sample["id"] in chosen_ids:
+                    continue
+                chosen.append(sample)
+                chosen_ids.add(sample["id"])
+                if len(chosen) >= total:
+                    break
+
         return chosen[:total]
 
     # ── epoch 시작마다 1회 호출 ──────────────────────────────────────────────

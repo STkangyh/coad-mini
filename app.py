@@ -45,6 +45,9 @@ def load_model(ckpt_path: Path) -> GRUDetector:
         feature_dim=ckpt.get("feature_dim", FEATURE_DIM),
         hidden_dim=ckpt.get("hidden_dim",  HIDDEN_DIM),
         num_classes=ckpt.get("n_classes",  N_CLASSES),
+        num_layers=ckpt.get("num_layers", 1),
+        dropout=ckpt.get("dropout", 0.0),
+        bidirectional=ckpt.get("bidirectional", False),
     )
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
