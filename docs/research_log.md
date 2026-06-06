@@ -236,3 +236,60 @@ FastAPI 데모 (실시간 자막 포함)
 > 심층 분석을 통해 A-GEM의 효과가  
 > *replay 비율의 적절한 조절(25%)* 과  
 > *class-balanced 메모리 구성* 에서 비롯됨을 확인했다.
+
+---
+
+## 11. 후속 탐색 — "A-GEM 고정 후, 다음 병목은 어디인가"
+
+A-GEM 구성이 수렴한 뒤, 추가 성능 향상이 어디서 나올지 네 가지 방향을 순차적으로 검증했다.
+모두 동일 셋업(48 classes / 8 stages / 3-seed / A-GEM balanced mem=50 replay=0.25)에서 비교했다.
+
+### 11-1. 모델 용량 (capacity sweep)
+hidden 256→512, 1-layer→2-layer, balanced→balanced_hard. 모두 **개선 없음 또는 악화**.
+→ GRU 용량/메모리 전략은 병목이 아니다. (`reports/capacity_ablation_cv_report.md`)
+
+### 11-2. Feature Backbone (CLIP B/32 → OpenCLIP L/14)
+| | Avg Acc | S1 Drop |
+|---|---|---|
+| CLIP B/32 (512d) | 0.388 | -0.078 |
+| OpenCLIP L/14 (768d) | 0.401 ± 0.033 | +0.047 |
+
++0.013 (3-seed ±0.033 분산 내, 사실상 노이즈). (`reports/openclip_l14_result.md`)
+
+### 11-3. Temporal 복잡도 (GRU → GRU + MultiheadAttention)
+| | Avg Acc | S1 Drop |
+|---|---|---|
+| GRU | 0.401 | +0.047 |
+| GRU + Attention | **0.298 ± 0.019** | **+0.240** |
+
+정확도 -0.103, 망각 대폭 악화. 파라미터가 늘면 A-GEM 제약이 약해져 **망각이 급증**.
+→ 아키텍처 복잡도 증가는 역효과. (`reports/gru_attention_result.md`)
+
+### 11-4. 데이터 규모 (data-fraction scaling)
+동일 영상을 25/50/100%로 줄여 B/32 vs L/14 비교 (subsample은 backbone과 무관하게 동일).
+
+| 데이터 | B/32 | L/14 | Δ |
+|---|---|---|---|
+| 25% | 0.314 | 0.339 | +0.026 |
+| 50% | 0.370 | 0.394 | +0.024 |
+| 100% | 0.388 | 0.401 | +0.013 |
+
+- 데이터 25→100%: **+0.06~0.07** (backbone +0.01~0.026, 아키텍처 0/악화보다 압도적)
+- L/14 우위는 **저데이터 현상** — 데이터가 늘수록 격차가 좁혀짐(+0.026→+0.013). "데이터가 적어 backbone 효과가 가려졌다"는 가설은 **기각**.
+- 두 곡선 모두 100%에서 아직 상승 중 = **saturation 전**. (`reports/data_scale_result.md`)
+
+### 11-5. 종합 결론
+
+```text
+GRU 용량         ❌
+Memory 전략      ❌
+Feature backbone ⚠️  저데이터에서만 소폭, 고데이터서 소멸
+Temporal 복잡도   ❌  (Attention 오히려 악화)
+데이터 규모       ⭕  지배적 레버, 곡선 아직 상승 중
+```
+
+> 모델 측에서는 **단순 GRU + A-GEM(balanced, mem=50)이 이 셋업의 강건한 최적점**이며,
+> 아키텍처·backbone 복잡도를 더 올리는 방향은 수익이 없었다.
+> **다음 성능 레버는 모델이 아니라 학습 데이터 규모 확대**에 있다.
+> (이는 Ego4D 확장 시 backbone을 굳이 L/14로 키우기보다 데이터·클래스 커버리지에
+> 투자하는 편이 낫다는 함의로 이어진다.)
