@@ -11,9 +11,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# ── Claude Code local state (agent worktrees, local settings) ──
-.claude/worktrees/
-.claude/settings.local.json
+# ── Claude Code local state (worktrees, IDE launch config, local settings) ──
+.claude/
 
 # ── Local experiment artifacts: extracted feature tensors ─────
 # Per-backbone feature dirs are large and regenerable — never commit.
