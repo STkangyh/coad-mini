@@ -1,18 +1,36 @@
+# ── OS / editor ───────────────────────────────────────────────
 .DS_Store
+.idea/
+.vscode/
+
+# ── Python env / caches ───────────────────────────────────────
 .venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Local experiment artifacts
+# ── Claude Code local state (agent worktrees, local settings) ──
+.claude/worktrees/
+.claude/settings.local.json
+
+# ── Local experiment artifacts: extracted feature tensors ─────
+# Per-backbone feature dirs are large and regenerable — never commit.
 data/features/
+data/features_*/
 data/features.npy
 data/labels.npy
+
+# ── Local subset exports (large regenerated manifests) ────────
 data/subset/*_subset.csv
 data/subset/*_subset.json
 data/subset/validation_subset.csv
 data/subset/validation_subset.json
 
-# Python / tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# ── Local session orchestration scripts (hardcoded paths/PIDs) ─
+dev/auto_run_l14.sh
+dev/pipeline_driver.py
+
+# ── Misc local logs ───────────────────────────────────────────
+*.log

@@ -104,21 +104,25 @@ def sample_frames(video_path: Path, n: int) -> list[Image.Image]:
 
 @torch.no_grad()
 def extract(frames: list[Image.Image], model, processor, device: str) -> np.ndarray:
-    """PIL frames -> normalized image features."""
-    inputs = processor(images=frames, return_tensors="pt").to(device)
+    """PIL frames -> normalized image features.
 
-    if hasattr(model, "get_image_features"):
-        feats = model.get_image_features(**inputs)
-    else:
-        vision_inputs = {
-            key: value
-            for key, value in inputs.items()
-            if key in {"pixel_values", "attention_mask"}
-        }
-        vision_out = model.vision_model(**vision_inputs)
-        feats = vision_out.pooler_output
+    Always uses the vision encoder path (pixel_values only) to avoid
+    text-encoder side-effects from **inputs unpacking on CLIPModel.
+    """
+    inputs = processor(images=frames, return_tensors="pt").to(device)
+    pixel_values = inputs["pixel_values"]
+
+    if hasattr(model, "vision_model"):
+        # CLIP / OpenCLIP / SigLIP — use vision encoder + optional projection
+        vision_out = model.vision_model(pixel_values=pixel_values)
+        feats = vision_out.pooler_output          # (N, hidden_dim)
         if hasattr(model, "visual_projection"):
-            feats = model.visual_projection(feats)
+            feats = model.visual_projection(feats)  # (N, proj_dim)
+    elif hasattr(model, "get_image_features"):
+        # Fallback: models that only expose get_image_features
+        feats = model.get_image_features(pixel_values=pixel_values)
+    else:
+        raise RuntimeError(f"Cannot extract image features from {type(model).__name__}")
 
     feats = feats / feats.norm(dim=-1, keepdim=True).clamp_min(1e-12)
     return feats.cpu().float().numpy()
@@ -198,10 +202,18 @@ def process_split(
     return feature_dim
 
 
+def select_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"          # Apple Silicon GPU — much faster than CPU
+    return "cpu"
+
+
 def main():
     args = parse_args()
     config = resolve_config(args)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = select_device()
 
     print(f"Loading {config.model_name} on {device}...")
     model = AutoModel.from_pretrained(config.model_name).to(device)
