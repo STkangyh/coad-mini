@@ -17,11 +17,11 @@ Compact continual-learning experiments for video action recognition on a 48-clas
 
 ## Applications
 
-All three reuse the same `CLIP features → GRU → A-GEM` core:
+All three reuse the same `CLIP features → GRU → A-GEM` core and are **wired into the FastAPI demo UI** (`GET /`):
 
-- **Realtime captioning** — streaming per-window action prediction overlaid on the video (`POST /predict_rt` + the demo UI).
-- **Few-shot enrollment** — register a brand-new action class (48 → 48+K) from a few example videos via A-GEM replay, without catastrophic forgetting (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
-- **Anomaly / novel-action (OOD) detection** — flag out-of-distribution or low-confidence actions on the prediction stream. Scoring (max-softmax-prob / entropy / energy) uses one convention — **higher score == more OOD** — with a calibrated threshold + temporal smoothing (`POST /predict_anomaly`). Calibrate: `python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`. Details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
+- **Realtime captioning** — streaming per-window action prediction overlaid on the video (`POST /predict_rt`).
+- **Anomaly / novel-action (OOD) detection** — an OOD-score badge on the realtime stream (turns red when an action looks out-of-distribution). Scoring (max-softmax-prob / entropy / energy) uses one convention — **higher score == more OOD** — with a calibrated threshold + temporal smoothing (`POST /predict_anomaly`). Calibrate: `python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`. Details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
+- **Few-shot enrollment** — a UI panel (label + example videos) to register a brand-new action class (48 → 48+K) via A-GEM replay, without catastrophic forgetting (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
 
 ## Key findings
 
