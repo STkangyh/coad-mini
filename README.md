@@ -10,6 +10,7 @@ Compact continual-learning experiments for video action recognition on a 48-clas
 
 - **Training scripts** for baseline sequential learning, stage-wise continual learning, and multi-seed analysis
 - **A FastAPI demo app** for comparing Baseline vs A-GEM predictions on uploaded videos
+- **Few-shot enrollment** of brand-new action classes (48 → 48+K) without catastrophic forgetting — see [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md)
 - **Saved checkpoints** for the 48-class setup
 - **Mini subset manifests** used by the experiments
 

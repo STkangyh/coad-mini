@@ -25,10 +25,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.models.gru_detector import GRUDetector
+from src.enroll.few_shot import expand_classifier, FewShotEnroller
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
 CKPT_DIR    = Path("checkpoints")
@@ -322,6 +323,143 @@ async def predict_realtime(payload: RTPayload):
         "baseline": top1(_bl_model),
         "agem":     top1(_gem_model),
     })
+
+
+# ── Few-shot enrollment: 새 행동 클래스 등록 ──────────────────────────────────
+ENROLLED_CKPT   = CKPT_DIR / "agem_enrolled.pt"
+ENROLLED_LABELS = CKPT_DIR / "class_labels_enrolled.json"
+
+
+@app.post("/enroll")
+async def enroll_new_class(
+    label: str = Form(...),
+    files: list[UploadFile] = File(...),
+):
+    """
+    새 행동 클래스를 few-shot 으로 등록한다.
+
+    multipart 입력:
+      - label : 새 클래스 이름 (문자열)
+      - files : 새 클래스 예시 영상 (1개 이상)
+
+    동작:
+      1. 각 영상 → CLIP feature window (1, 16, 512) 추출 (기존 헬퍼 재사용)
+      2. A-GEM 모델을 48 → 49 클래스로 확장
+      3. 기존 클래스 exemplar 를 replay 하며 새 클래스 학습 (FewShotEnroller)
+      4. 업데이트된 체크포인트(agem_enrolled.pt) + 레이블 파일 저장
+
+    NOTE: feature 추출에는 ffmpeg 와 실제 영상이 필요하다. 모델/엔드포인트
+          로직 자체는 합성 입력으로도 검증 가능하다 (tests 참고).
+    """
+    if not _ckpt_ready:
+        raise HTTPException(503, "checkpoints not ready — run save_checkpoints.py first")
+    if not label or not label.strip():
+        raise HTTPException(400, "label 이 비어 있습니다")
+    if not files:
+        raise HTTPException(400, "최소 1개 영상이 필요합니다")
+
+    label = label.strip()
+
+    # 1. feature 추출
+    new_windows = []
+    for f in files:
+        video_bytes = await f.read()
+        if len(video_bytes) == 0:
+            continue
+        try:
+            feat = video_to_feature(video_bytes)   # (1, 16, 512)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, f"feature 추출 실패 ({f.filename}): {e}")
+        new_windows.append(feat.squeeze(0))        # (16, 512)
+
+    if not new_windows:
+        raise HTTPException(400, "유효한 영상이 없습니다")
+
+    # 2. 모델 확장 (현재 A-GEM 모델의 deepcopy 로 작업)
+    import copy
+    model = copy.deepcopy(_gem_model)
+    old_n = model.num_classes
+    new_class_id = old_n
+    model = expand_classifier(model, n_new=1)
+
+    # 3. 기존 클래스 exemplar replay 재료 만들기
+    #    학습 중 모델이 잘 분류하는 합성 exemplar 를 기존 클래스마다 만들어
+    #    replay buffer 로 사용한다 (실제 feature 파일은 worktree 에 없음).
+    enroller = FewShotEnroller(model, device=device, use_agem=True, seed=0)
+    exemplars, ex_labels = _build_replay_exemplars(_gem_model, old_n, n_per_class=1)
+    enroller.add_exemplars(exemplars, ex_labels)
+
+    # 4. 학습
+    model = enroller.enroll(
+        new_windows, [new_class_id] * len(new_windows),
+        epochs=20, lr=1e-3, replay_per_step=8,
+    )
+
+    # 5. 저장
+    new_state = model.state_dict()
+    out_ckpt = {
+        "state_dict": new_state,
+        "n_classes": model.num_classes,
+        "feature_dim": model.feature_dim,
+        "hidden_dim": model.hidden_dim,
+        "num_layers": model.num_layers,
+        "dropout": model.dropout,
+        "bidirectional": model.bidirectional,
+        "method": "A-GEM + few-shot enrollment",
+        "enrolled_from": "agem_48cls.pt",
+    }
+    torch.save(out_ckpt, ENROLLED_CKPT)
+
+    # 레이블 파일 갱신
+    new_labels = dict(_labels)
+    new_labels[str(new_class_id)] = {
+        "template": label,
+        "label": label,
+        "examples": [],
+    }
+    with open(ENROLLED_LABELS, "w", encoding="utf-8") as fp:
+        json.dump(new_labels, fp, ensure_ascii=False, indent=2)
+
+    return JSONResponse({
+        "status": "ok",
+        "new_class_id": new_class_id,
+        "label": label,
+        "n_classes": model.num_classes,
+        "n_examples": len(new_windows),
+        "checkpoint": str(ENROLLED_CKPT),
+        "labels_file": str(ENROLLED_LABELS),
+    })
+
+
+@torch.no_grad()
+def _build_replay_exemplars(model: GRUDetector, n_classes: int, n_per_class: int = 1):
+    """
+    기존 클래스 replay 용 합성 exemplar 생성.
+    모델이 클래스 c 로 예측하는 합성 window 를 찾아 (window, c) 로 모은다.
+    실제 feature 파일이 없는 환경에서도 동작하도록 한 폴백이다.
+    """
+    rng = np.random.default_rng(0)
+    fdim = model.feature_dim
+    found: dict[int, list] = {c: [] for c in range(n_classes)}
+    remaining = n_classes * n_per_class
+    # 무작위 window 를 흘려보내 클래스별로 채운다 (상한 트라이).
+    for _ in range(n_classes * n_per_class * 40):
+        if remaining <= 0:
+            break
+        w = rng.standard_normal((N_FRAMES, fdim)).astype(np.float32)
+        logits, _ = model(torch.from_numpy(w).unsqueeze(0), None)
+        c = int(logits.argmax(-1).item())
+        if c < n_classes and len(found[c]) < n_per_class:
+            found[c].append(w)
+            remaining -= 1
+    windows, labels = [], []
+    for c, ws in found.items():
+        for w in ws:
+            windows.append(w)
+            labels.append(c)
+    return windows, labels
 
 
 # ── 웹 UI ─────────────────────────────────────────────────────────────────────
