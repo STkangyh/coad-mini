@@ -633,6 +633,12 @@ HTML_PAGE = """<!DOCTYPE html>
       <!-- ① 현재 행동 자막 (영상 위) -->
       <div id="subtitleOverlay" style="display:none;position:absolute;bottom:52px;
            left:0;right:0;pointer-events:none;padding:0 10px">
+        <!-- 이상/신규(OOD) 동작 배지 -->
+        <div id="anomalyBadge" style="display:none;text-align:center;margin-bottom:5px">
+          <span id="anomalyChip" style="background:rgba(40,50,70,0.85);color:#c9d1d9;
+                border-radius:6px;padding:3px 10px;font-size:0.7rem;font-weight:600;
+                backdrop-filter:blur(6px)">OOD <span id="anomalyScoreText">—</span></span>
+        </div>
         <div style="display:flex;gap:6px;justify-content:center">
           <!-- Baseline -->
           <div id="subBaseline" style="background:rgba(200,60,50,0.88);color:#fff;
@@ -695,6 +701,29 @@ HTML_PAGE = """<!DOCTYPE html>
     <div class="result-grid" id="resultGrid"></div>
   </div>
 
+  <!-- 새 동작 등록 (few-shot) -->
+  <div class="card">
+    <h2>➕ 새 동작 등록 <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(few-shot · A-GEM)</span></h2>
+    <p style="font-size:0.82rem;color:#8b949e;margin-bottom:12px">
+      새 행동 클래스를 예시 영상 몇 개로 즉석 등록합니다.
+      기존 48개 클래스를 잊지 않고(A-GEM replay) 49번째(+)를 추가해요.
+    </p>
+    <input id="enrollLabel" type="text" placeholder="새 동작 이름 (예: 손 흔들기)"
+           style="width:100%;padding:11px 12px;border:1px solid #30363d;border-radius:8px;
+                  background:#0d1117;color:#e6edf3;font-size:0.95rem;margin-bottom:12px">
+    <div class="upload-area" id="enrollDrop" onclick="document.getElementById('enrollFiles').click()">
+      <input type="file" id="enrollFiles" accept="video/*,.webm,.mp4,.avi" multiple>
+      <div class="icon">📥</div>
+      <div class="hint">예시 영상 1개 이상 선택 (여러 개 가능)</div>
+      <div class="filename" id="enrollFileLabel"></div>
+    </div>
+    <button class="btn" id="enrollBtn" onclick="runEnroll()">➕ 등록</button>
+    <div class="error" id="enrollError"></div>
+    <div id="enrollResult" style="display:none;margin-top:12px;padding:12px;
+         background:#0d3321;border-left:3px solid #3fb950;border-radius:8px;
+         font-size:0.9rem;color:#e6edf3;line-height:1.5"></div>
+  </div>
+
   <!-- Forgetting 곡선 -->
   <div class="card">
     <h2>📉 Forgetting 곡선 <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(Stage 1 accuracy over stages)</span></h2>
@@ -735,6 +764,7 @@ function resetUpload() {
   document.getElementById('resultCard').style.display = 'none';
   document.getElementById('subtitleOverlay').style.display = 'none';
   document.getElementById('timelineWrap').style.display = 'none';
+  document.getElementById('anomalyBadge').style.display = 'none';
   document.getElementById('timelineTrack').innerHTML = '';
 }
 
@@ -822,11 +852,34 @@ async function runRT(frames) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ frames }),
     });
-    if (!res.ok) return;
-    const data = await res.json();
-    storeAndRender(data);
+    if (res.ok) storeAndRender(await res.json());
+    // 이상/신규(OOD) 점수 — 같은 프레임으로 병렬 호출 (비차단)
+    fetch('/predict_anomaly', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ frames }),
+    }).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) updateAnomaly(d); })
+      .catch(() => {});
   } catch(_) {}
   finally { inferPending = false; }
+}
+
+// ── 이상/신규(OOD) 배지 업데이트 ───────────────────────────────────────────────
+function updateAnomaly(d) {
+  const badge = document.getElementById('anomalyBadge');
+  const chip  = document.getElementById('anomalyChip');
+  badge.style.display = 'block';
+  const score = (d.anomaly_score != null) ? d.anomaly_score.toFixed(2) : '—';
+  if (d.is_anomaly) {
+    chip.style.background = 'rgba(248,81,73,0.92)';
+    chip.style.color = '#fff';
+    chip.innerHTML = '⚠ 학습되지 않은 동작? <span id="anomalyScoreText">' + score + '</span>';
+  } else {
+    chip.style.background = 'rgba(40,50,70,0.85)';
+    chip.style.color = '#c9d1d9';
+    chip.innerHTML = 'OOD score <span id="anomalyScoreText">' + score + '</span>';
+  }
 }
 
 // ── 안정화: 최근 N번 중 최빈값 선택 ──────────────────────────────────────────
@@ -933,6 +986,7 @@ function startRT() {
   document.getElementById('rtBtn').style.background = 'rgba(248,81,73,0.85)';
   document.getElementById('subtitleOverlay').style.display = 'block';
   document.getElementById('timelineWrap').style.display = 'block';
+  document.getElementById('anomalyBadge').style.display = 'block';
 
   videoPreview.play().catch(()=>{});
   rtTimer = setInterval(captureFrame, CAPTURE_INTERVAL);
@@ -1098,6 +1152,45 @@ async function loadForgetting() {
 
   } catch (e) {
     container.innerHTML = `<div class="error">로드 실패: ${e.message}</div>`;
+  }
+}
+
+// ── 새 동작 등록 (few-shot) ────────────────────────────────────────────────────
+document.getElementById('enrollFiles').addEventListener('change', () => {
+  const fs = document.getElementById('enrollFiles').files;
+  document.getElementById('enrollFileLabel').textContent =
+    fs.length ? `✓ ${fs.length}개 선택됨` : '';
+});
+
+async function runEnroll() {
+  const label = document.getElementById('enrollLabel').value.trim();
+  const files = document.getElementById('enrollFiles').files;
+  const err   = document.getElementById('enrollError');
+  const out   = document.getElementById('enrollResult');
+  const btn   = document.getElementById('enrollBtn');
+  err.textContent = ''; out.style.display = 'none';
+
+  if (!label)        { err.textContent = '동작 이름을 입력하세요'; return; }
+  if (!files.length) { err.textContent = '예시 영상을 1개 이상 선택하세요'; return; }
+
+  btn.disabled = true; btn.textContent = '⏳ 등록 중...';
+  const fd = new FormData();
+  fd.append('label', label);
+  for (const f of files) fd.append('files', f);
+
+  try {
+    const res  = await fetch('/enroll', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    out.style.display = 'block';
+    out.innerHTML =
+      `✅ '<b>${data.label}</b>' 등록 완료 — class #${data.new_class_id}, 총 ${data.n_classes}개 클래스 ` +
+      `(예시 ${data.n_examples}개)<br>` +
+      `<span style="color:#8b949e;font-size:0.78rem">checkpoint: ${data.checkpoint}</span>`;
+  } catch (e) {
+    err.textContent = '오류: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '➕ 등록';
   }
 }
 
