@@ -15,17 +15,27 @@ Compact continual-learning experiments for video action recognition on a 48-clas
 - **Saved checkpoints** for the 48-class setup
 - **Mini subset manifests** used by the experiments
 
-## Anomaly / OOD detection
+## Applications
 
-Flag when the current action is out-of-distribution (an action the model was
-never trained on, or a low-confidence / novel one). Scoring functions (max
-softmax prob, predictive entropy, energy) follow a single convention —
-**higher score == more OOD** — and `AnomalyScorer` adds a calibrated threshold
-plus temporal smoothing. Calibrate with
-`python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`,
-and query `POST /predict_anomaly` (base64 frames, same payload as
-`/predict_rt`) for `{top1, top1_prob, anomaly_score, is_anomaly}`. Full
-details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
+All three reuse the same `CLIP features → GRU → A-GEM` core:
+
+- **Realtime captioning** — streaming per-window action prediction overlaid on the video (`POST /predict_rt` + the demo UI).
+- **Few-shot enrollment** — register a brand-new action class (48 → 48+K) from a few example videos via A-GEM replay, without catastrophic forgetting (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
+- **Anomaly / novel-action (OOD) detection** — flag out-of-distribution or low-confidence actions on the prediction stream. Scoring (max-softmax-prob / entropy / energy) uses one convention — **higher score == more OOD** — with a calibrated threshold + temporal smoothing (`POST /predict_anomaly`). Calibrate: `python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`. Details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
+
+## Key findings
+
+After A-GEM converged, we searched for the next bottleneck. **Data quantity dominates — not architecture:**
+
+| Lever | Effect on Avg Acc |
+|---|---|
+| GRU capacity (256→512, +layers) | none / worse |
+| Memory strategy (balanced/hard) | none |
+| Backbone CLIP B/32 → OpenCLIP L/14 | +0.01–0.026 (vanishes at full data) |
+| GRU → GRU+Attention | **−0.103** (forgetting +0.240) |
+| **Training data 25% → 100%** | **+0.06–0.07** (still rising) |
+
+Conclusion: a **simple GRU + A-GEM is the robust optimum**; scale data, not architecture. Reports: [openclip_l14](reports/openclip_l14_result.md) · [gru_attention](reports/gru_attention_result.md) · [data_scale](reports/data_scale_result.md). Full narrative: [docs/research_log.md](docs/research_log.md) §11.
 
 ## Method overview
 
@@ -48,34 +58,28 @@ coad-mini/
 ├── config.py                   # Shared constants and path configuration
 ├── experiments/                # Training and analysis scripts
 │   ├── train_baseline.py       # Single-pass baseline training
-│   ├── train_coad.py           # Older orthogonal-gradient experiment
 │   ├── train_stage.py          # Stage-based continual learning comparison
-│   ├── run_seeds.py            # Multi-seed baseline vs OrthGrad
 │   ├── run_stage_seeds.py      # Multi-seed baseline vs A-GEM
+│   ├── run_capacity_ablation.py# Capacity / backbone / GRU+Attention sweep
+│   ├── run_data_scale.py       # Data-fraction scaling (B/32 vs L/14)
 │   ├── run_analysis.py         # A-GEM replay/memory ablations
+│   ├── demo_few_shot.py        # Few-shot enrollment demo
+│   ├── calibrate_anomaly.py    # Anomaly-score threshold calibration
 │   └── save_checkpoints.py     # Train and save Baseline/A-GEM checkpoints
 ├── src/                        # Core library code
 │   ├── models/
-│   │   └── gru_detector.py
-│   ├── utils/
-│   │   ├── gem.py
-│   │   └── orthogonal_grad.py
+│   │   ├── gru_detector.py
+│   │   └── gru_attention.py    # GRU + MultiheadAttention temporal model
+│   ├── enroll/few_shot.py      # Few-shot new-class enrollment (A-GEM)
+│   ├── anomaly/detector.py     # OOD / anomaly scoring
+│   ├── utils/{gem.py, orthogonal_grad.py}
 │   └── trainer.py              # Shared train/eval loops
-├── scripts/                    # Data preparation
-│   ├── make_subset.py
-│   ├── create_mini_subset.py
-│   └── extract_clip_features.py
-├── dev/                        # Development utilities
-│   ├── make_dummy_data.py
-│   └── make_pattern_data.py
-├── checkpoints/
-│   ├── baseline_48cls.pt
-│   ├── agem_48cls.pt
-│   └── class_labels.json
-└── data/
-    └── subset/
-        ├── train_mini.json
-        └── val_mini.json
+├── tests/                      # pytest suites for the modules above
+├── scripts/                    # Data preparation + feature extraction
+├── docs/                       # GitHub Pages site + research log + module docs
+├── reports/                    # Experiment result reports
+├── checkpoints/                # baseline_48cls.pt, agem_48cls.pt, class_labels.json
+└── data/subset/                # train_mini.json, val_mini.json
 ```
 
 ## Requirements
@@ -119,6 +123,8 @@ Endpoints:
 - `GET /forgetting` - forgetting curves from saved checkpoints
 - `POST /predict` - upload a video file
 - `POST /predict_rt` - realtime frame-based inference
+- `POST /predict_anomaly` - realtime inference + OOD/anomaly score
+- `POST /enroll` - few-shot register a new action class (multipart: `label` + `files`)
 
 ### 2. Recreate the mini subset manifests
 

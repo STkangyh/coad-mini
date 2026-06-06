@@ -72,16 +72,44 @@
       <ul>
         <li>48 classes organized as 8 stages × 6 classes</li>
         <li>Training/analysis scripts under <code>experiments/</code></li>
-        <li>FastAPI demo app for Baseline vs A-GEM inference</li>
+        <li>FastAPI demo app: realtime captioning, Baseline vs A-GEM inference</li>
         <li>Included checkpoints and mini subset manifests</li>
       </ul>
+    </section>
+
+    <section class="card">
+      <h2>Applications (built on the same pipeline)</h2>
+      <ul>
+        <li><strong>Realtime captioning</strong> — streaming per-window action prediction overlaid on video (<code>/predict_rt</code>)</li>
+        <li><strong>Few-shot enrollment</strong> — register a brand-new action class (48 → 48+K) via A-GEM replay, without catastrophic forgetting (<code>/enroll</code>) — <a href="few_shot_enrollment.md">docs</a></li>
+        <li><strong>Anomaly / OOD detection</strong> — flag out-of-distribution / low-confidence actions on the stream (<code>/predict_anomaly</code>) — <a href="anomaly_detection.md">docs</a></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Key finding — what actually moves the needle</h2>
+      <p>
+        After A-GEM converged, we searched for the next bottleneck across model capacity,
+        feature backbone, temporal architecture, and data scale. The dominant lever turned
+        out to be <strong>data quantity</strong>, not architecture.
+      </p>
+      <ul>
+        <li>GRU capacity / memory strategy → no gain</li>
+        <li>Backbone CLIP B/32 → OpenCLIP L/14 → only +0.01–0.026 (vanishes at full data)</li>
+        <li>GRU + Attention → worse (−0.103 acc, forgetting +0.240)</li>
+        <li><strong>Data 25% → 100% → +0.06–0.07</strong> (curves still rising)</li>
+      </ul>
+      <p class="muted">
+        Conclusion: a simple GRU + A-GEM is the robust optimum; scale data, not architecture.
+        See <a href="data_scale.md">data-scale study</a> and <a href="gru_attention.md">GRU+Attention result</a>.
+      </p>
     </section>
 
     <section class="card">
       <h2>📓 연구 일지 (Research Log)</h2>
       <p>
         실험 설계부터 최종 결과까지, 코드에 담기지 않은 의사결정 과정을 기록한 문서입니다.<br>
-        <span class="muted">OrthGrad 가설 → 실패 분석 → A-GEM 전환 → Class Scaling → Memory Ablation → Replay Ratio / Selection 심층 분석</span>
+        <span class="muted">OrthGrad 가설 → 실패 분석 → A-GEM 전환 → Class Scaling → Memory Ablation → Replay Ratio / Selection 심층 분석 → Backbone / Architecture / Data Scale sweep</span>
       </p>
       <p><a href="research_log.md">연구 일지 보기 →</a></p>
     </section>
