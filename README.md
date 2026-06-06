@@ -11,8 +11,21 @@ Compact continual-learning experiments for video action recognition on a 48-clas
 - **Training scripts** for baseline sequential learning, stage-wise continual learning, and multi-seed analysis
 - **A FastAPI demo app** for comparing Baseline vs A-GEM predictions on uploaded videos
 - **Few-shot enrollment** of brand-new action classes (48 → 48+K) without catastrophic forgetting — see [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md)
+- **Anomaly / novel-action (OOD) detection** on the prediction stream — see [docs/anomaly_detection.md](docs/anomaly_detection.md)
 - **Saved checkpoints** for the 48-class setup
 - **Mini subset manifests** used by the experiments
+
+## Anomaly / OOD detection
+
+Flag when the current action is out-of-distribution (an action the model was
+never trained on, or a low-confidence / novel one). Scoring functions (max
+softmax prob, predictive entropy, energy) follow a single convention —
+**higher score == more OOD** — and `AnomalyScorer` adds a calibrated threshold
+plus temporal smoothing. Calibrate with
+`python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`,
+and query `POST /predict_anomaly` (base64 frames, same payload as
+`/predict_rt`) for `{top1, top1_prob, anomaly_score, is_anomaly}`. Full
+details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
 
 ## Method overview
 

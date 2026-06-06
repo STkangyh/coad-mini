@@ -30,6 +30,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.models.gru_detector import GRUDetector
 from src.enroll.few_shot import expand_classifier, FewShotEnroller
+from src.anomaly.detector import AnomalyScorer
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
 CKPT_DIR    = Path("checkpoints")
@@ -229,6 +230,20 @@ else:
     _bl_model = _gem_model = _bl_ckpt = _gem_ckpt = None
     _labels = load_labels()
     print("⚠ Checkpoints not found. Run save_checkpoints.py first.")
+
+# ── Anomaly / OOD detector ────────────────────────────────────────────────────
+# Higher anomaly score == more out-of-distribution (see src/anomaly/detector.py).
+# Threshold can be calibrated offline via experiments/calibrate_anomaly.py;
+# ANOMALY_THRESHOLD env var overrides the conservative built-in default.
+import os as _os
+_ANOMALY_METRIC = _os.environ.get("ANOMALY_METRIC", "energy")
+_anomaly_thr_env = _os.environ.get("ANOMALY_THRESHOLD")
+_anomaly_scorer = AnomalyScorer(
+    metric=_ANOMALY_METRIC,
+    threshold=float(_anomaly_thr_env) if _anomaly_thr_env else None,
+    smoothing="ema",
+    ema_alpha=0.5,
+)
 
 
 # ── 라우트 ─────────────────────────────────────────────────────────────────────
@@ -460,6 +475,47 @@ def _build_replay_exemplars(model: GRUDetector, n_classes: int, n_per_class: int
             windows.append(w)
             labels.append(c)
     return windows, labels
+
+
+# ── 이상행동 / OOD 탐지 ────────────────────────────────────────────────────────
+@app.post("/predict_anomaly")
+async def predict_anomaly(payload: RTPayload):
+    """이상/신규(OOD) 행동 탐지.
+
+    입력: base64 PNG 프레임 리스트 (/predict_rt 와 동일).
+    출력: {top1, top1_prob, anomaly_score, is_anomaly}
+
+    anomaly_score 가 높을수록 OOD(학습되지 않은/저신뢰) 행동.
+    임계값은 ANOMALY_THRESHOLD 환경변수 또는 experiments/calibrate_anomaly.py
+    로 교정하며, 미설정 시 is_anomaly 는 항상 False(점수만 반환).
+    A-GEM 모델 logits 기준으로 평가한다.
+    """
+    if not _ckpt_ready:
+        raise HTTPException(503, "checkpoints not ready")
+    if len(payload.frames) == 0:
+        raise HTTPException(400, "frames 없음")
+
+    try:
+        feat = frames_to_feature(payload.frames)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"feature 추출 실패: {e}")
+
+    # 단발 추론이므로 temporal smoothing 미사용(smooth=False)
+    result = _anomaly_scorer.score_window(_gem_model, feat, smooth=False)
+    entry = _labels.get(str(result["top1"]), {})
+    label = entry.get("label") if isinstance(entry, dict) else str(entry)
+
+    return JSONResponse({
+        "top1": label or f"class_{result['top1']}",
+        "top1_class_id": result["top1"],
+        "top1_prob": result["top1_prob"],
+        "anomaly_score": result["raw_score"],
+        "is_anomaly": result["is_anomaly"],
+        "metric": _ANOMALY_METRIC,
+        "threshold": result["threshold"],
+    })
 
 
 # ── 웹 UI ─────────────────────────────────────────────────────────────────────
