@@ -1,0 +1,33 @@
+device: cpu
+seeds=[0, 1, 2] epochs=15
+feature_dir=/Users/younghoon-kang/coad-mini/data/features_openclip_l14 feature_dim=768 lr=0.0001
+memory: selection varies, mem=50, replay_ratio=0.25
+
+========================================================================
+  best_current_h256: hidden=256, layers=1, dropout=0.0, bidirectional=False, selection=balanced
+========================================================================
+  seed 0 ...
+    avg_acc=0.357  s1_drop=+0.090  s2_drop=+0.232
+  seed 1 ...
+    avg_acc=0.410  s1_drop=+0.065  s2_drop=+0.107
+  seed 2 ...
+    avg_acc=0.436  s1_drop=-0.013  s2_drop=+0.033
+
+========================================================================
+  attn_h256: hidden=256, layers=1, dropout=0.0, bidirectional=False, selection=balanced
+========================================================================
+  seed 0 ...
+    avg_acc=0.282  s1_drop=+0.268  s2_drop=+0.208
+  seed 1 ...
+    avg_acc=0.324  s1_drop=+0.182  s2_drop=+0.163
+  seed 2 ...
+    avg_acc=0.288  s1_drop=+0.270  s2_drop=+0.137
+
+
+========================================================================
+  Capacity Ablation Summary
+========================================================================
+  Config                           Avg Acc     +/-   S1 Drop     +/-
+  ------------------------------------------------------------------
+  best_current_h256                  0.401   0.033    +0.047   0.044
+  attn_h256                          0.298   0.019    +0.240   0.041
