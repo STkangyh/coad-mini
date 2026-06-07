@@ -3,6 +3,8 @@
 [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/Yhoon-3/coad-mini)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-2ea44f?logo=github)](https://stkangyh.github.io/coad-mini/)
 
+**▶ [Try the live demo](https://yhoon-3-coad-mini.hf.space)** — webcam realtime captioning · few-shot action enrollment · OOD detection.
+
 Compact continual-learning experiments for video action recognition on a 48-class subset of Something-Something V2. The project compares a plain sequential baseline against replay-based mitigation methods, mainly **A-GEM**, using **CLIP ViT-B/32 frame features** and a **GRU classifier**.
 
 ![Demo — Baseline vs A-GEM realtime captioning](docs/assets/demo.gif)
