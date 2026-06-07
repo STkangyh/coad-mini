@@ -34,6 +34,8 @@ from src.anomaly.detector import AnomalyScorer
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
 CKPT_DIR    = Path("checkpoints")
+ENROLLED_CKPT   = CKPT_DIR / "agem_enrolled.pt"       # few-shot 으로 확장된 모델 (persist)
+ENROLLED_LABELS = CKPT_DIR / "class_labels_enrolled.json"
 FEATURE_DIM = 512
 HIDDEN_DIM  = 256
 N_CLASSES   = 48
@@ -56,8 +58,8 @@ def load_model(ckpt_path: Path) -> GRUDetector:
     return model, ckpt
 
 
-def load_labels() -> dict:
-    p = CKPT_DIR / "class_labels.json"
+def load_labels(path: Path = None) -> dict:
+    p = path or (CKPT_DIR / "class_labels.json")
     if not p.exists():
         return {str(i): {"template": f"class_{i}", "label": f"class_{i}", "examples": []}
                 for i in range(N_CLASSES)}
@@ -221,11 +223,20 @@ app = FastAPI(title="A-GEM Continual Learning Demo", version="1.0")
 _ckpt_ready = (CKPT_DIR / "baseline_48cls.pt").exists() and \
               (CKPT_DIR / "agem_48cls.pt").exists()
 
+def _load_active_gem():
+    """enrolled 체크포인트가 있으면 그걸(=가르친 동작 유지), 없으면 base A-GEM 을 서빙."""
+    if ENROLLED_CKPT.exists() and ENROLLED_LABELS.exists():
+        m, ck = load_model(ENROLLED_CKPT)
+        return m, ck, load_labels(ENROLLED_LABELS), True
+    m, ck = load_model(CKPT_DIR / "agem_48cls.pt")
+    return m, ck, load_labels(), False
+
+
 if _ckpt_ready:
     _bl_model,  _bl_ckpt  = load_model(CKPT_DIR / "baseline_48cls.pt")
-    _gem_model, _gem_ckpt = load_model(CKPT_DIR / "agem_48cls.pt")
-    _labels = load_labels()
-    print("✓ Checkpoints loaded")
+    _gem_model, _gem_ckpt, _labels, _enrolled_active = _load_active_gem()
+    print(f"✓ Checkpoints loaded (enrolled_active={_enrolled_active}, "
+          f"n_classes={_gem_model.num_classes})")
 else:
     _bl_model = _gem_model = _bl_ckpt = _gem_ckpt = None
     _labels = load_labels()
@@ -341,17 +352,13 @@ async def predict_realtime(payload: RTPayload):
 
 
 # ── Few-shot enrollment: 새 행동 클래스 등록 ──────────────────────────────────
-ENROLLED_CKPT   = CKPT_DIR / "agem_enrolled.pt"
-ENROLLED_LABELS = CKPT_DIR / "class_labels_enrolled.json"
-
-
 @app.post("/enroll")
 async def enroll_new_class(
     label: str = Form(...),
     files: list[UploadFile] = File(...),
 ):
     """
-    새 행동 클래스를 few-shot 으로 등록한다.
+    새 행동 클래스를 few-shot 으로 등록하고, 서빙 모델에 즉시 반영(hot-swap)한다.
 
     multipart 입력:
       - label : 새 클래스 이름 (문자열)
@@ -359,13 +366,14 @@ async def enroll_new_class(
 
     동작:
       1. 각 영상 → CLIP feature window (1, 16, 512) 추출 (기존 헬퍼 재사용)
-      2. A-GEM 모델을 48 → 49 클래스로 확장
+      2. A-GEM 모델을 N → N+1 클래스로 확장
       3. 기존 클래스 exemplar 를 replay 하며 새 클래스 학습 (FewShotEnroller)
-      4. 업데이트된 체크포인트(agem_enrolled.pt) + 레이블 파일 저장
+      4. 체크포인트/레이블 저장(persist) + 서빙 모델 즉시 교체 → /predict_rt 에 바로 등장
 
     NOTE: feature 추출에는 ffmpeg 와 실제 영상이 필요하다. 모델/엔드포인트
           로직 자체는 합성 입력으로도 검증 가능하다 (tests 참고).
     """
+    global _gem_model, _gem_ckpt, _labels
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready — run save_checkpoints.py first")
     if not label or not label.strip():
@@ -437,6 +445,11 @@ async def enroll_new_class(
     with open(ENROLLED_LABELS, "w", encoding="utf-8") as fp:
         json.dump(new_labels, fp, ensure_ascii=False, indent=2)
 
+    # 6. ★ 서빙 모델 즉시 교체 (hot-swap) — /predict_rt 가 새 동작을 바로 인식
+    _gem_model = model
+    _gem_ckpt  = out_ckpt
+    _labels    = new_labels
+
     return JSONResponse({
         "status": "ok",
         "new_class_id": new_class_id,
@@ -445,6 +458,7 @@ async def enroll_new_class(
         "n_examples": len(new_windows),
         "checkpoint": str(ENROLLED_CKPT),
         "labels_file": str(ENROLLED_LABELS),
+        "live": True,
     })
 
 
@@ -475,6 +489,40 @@ def _build_replay_exemplars(model: GRUDetector, n_classes: int, n_per_class: int
             windows.append(w)
             labels.append(c)
     return windows, labels
+
+
+# ── 등록된 동작 관리 ──────────────────────────────────────────────────────────
+@app.get("/classes")
+def list_classes():
+    """현재 서빙 모델의 클래스 목록 (기본 48 + 사용자가 등록한 동작)."""
+    if _gem_model is None:
+        raise HTTPException(503, "model not ready")
+    items = []
+    for cid in range(_gem_model.num_classes):
+        e = _labels.get(str(cid), {})
+        lbl = e.get("label") if isinstance(e, dict) else str(e)
+        items.append({"id": cid, "label": lbl or f"class_{cid}", "enrolled": cid >= N_CLASSES})
+    return {
+        "n_classes": _gem_model.num_classes,
+        "base_count": N_CLASSES,
+        "enrolled": [x for x in items if x["enrolled"]],
+    }
+
+
+@app.post("/reset_classes")
+def reset_classes():
+    """등록한 동작을 모두 제거하고 기본 48-class A-GEM 모델로 되돌린다."""
+    global _gem_model, _gem_ckpt, _labels
+    if not _ckpt_ready:
+        raise HTTPException(503, "checkpoints not ready")
+    _gem_model, _gem_ckpt = load_model(CKPT_DIR / "agem_48cls.pt")
+    _labels = load_labels()
+    for p in (ENROLLED_CKPT, ENROLLED_LABELS):
+        try:
+            p.unlink()
+        except FileNotFoundError:
+            pass
+    return {"status": "reset", "n_classes": _gem_model.num_classes}
 
 
 # ── 이상행동 / OOD 탐지 ────────────────────────────────────────────────────────
@@ -624,6 +672,9 @@ HTML_PAGE = """<!DOCTYPE html>
       <div class="hint">클릭하거나 영상을 끌어다 놓으세요<br>webm · mp4 · avi 지원</div>
       <div class="filename" id="filenameLabel"></div>
     </div>
+    <!-- 웹캠 라이브 -->
+    <button class="btn" id="webcamBtn" onclick="startWebcam()"
+            style="background:#1f6feb;margin-top:10px">📷 웹캠으로 실시간 데모</button>
     <!-- 업로드 후: 인라인 플레이어 + 자막 오버레이 -->
     <div id="videoWrap" style="display:none;margin-top:12px;border-radius:8px;
          overflow:hidden;background:#000;position:relative;user-select:none">
@@ -722,6 +773,16 @@ HTML_PAGE = """<!DOCTYPE html>
     <div id="enrollResult" style="display:none;margin-top:12px;padding:12px;
          background:#0d3321;border-left:3px solid #3fb950;border-radius:8px;
          font-size:0.9rem;color:#e6edf3;line-height:1.5"></div>
+
+    <!-- 등록된 동작 목록 -->
+    <div id="enrolledWrap" style="display:none;margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:0.8rem;color:#8b949e">🧩 내가 등록한 동작</span>
+        <button onclick="resetClasses()" style="background:#21262d;color:#f85149;border:1px solid #30363d;
+                border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer">전체 초기화</button>
+      </div>
+      <div id="enrolledList" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
   </div>
 
   <!-- Forgetting 곡선 -->
@@ -746,6 +807,8 @@ const videoWrap     = document.getElementById('videoWrap');
 const videoPreview  = document.getElementById('videoPreview');
 
 function showVideoPreview(file) {
+  stopWebcam();
+  videoPreview.setAttribute('controls', '');
   const url = URL.createObjectURL(file);
   videoPreview.src = url;
   dropZone.style.display = 'none';
@@ -753,8 +816,36 @@ function showVideoPreview(file) {
   predictBtn.disabled = false;
 }
 
+// ── 웹캠 라이브 ───────────────────────────────────────────────────────────────
+let webcamStream = null;
+async function startWebcam() {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 480, height: 480 }, audio: false });
+  } catch (e) {
+    document.getElementById('errorMsg').textContent = '웹캠 접근 실패: ' + e.message;
+    return;
+  }
+  stopRT();
+  videoPreview.srcObject = webcamStream;
+  videoPreview.removeAttribute('controls');
+  dropZone.style.display = 'none';
+  videoWrap.style.display = 'block';
+  document.getElementById('resultCard').style.display = 'none';
+  predictBtn.disabled = true;          // 라이브 모드엔 파일 업로드 예측 비활성
+  await videoPreview.play().catch(() => {});
+  startRT();
+}
+
+function stopWebcam() {
+  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+  if (videoPreview.srcObject) videoPreview.srcObject = null;
+}
+
 function resetUpload() {
   stopRT();
+  stopWebcam();
+  videoPreview.setAttribute('controls', '');
   videoPreview.src = '';
   videoWrap.style.display = 'none';
   dropZone.style.display = 'block';
@@ -1185,8 +1276,12 @@ async function runEnroll() {
     out.style.display = 'block';
     out.innerHTML =
       `✅ '<b>${data.label}</b>' 등록 완료 — class #${data.new_class_id}, 총 ${data.n_classes}개 클래스 ` +
-      `(예시 ${data.n_examples}개)<br>` +
+      `(예시 ${data.n_examples}개) — 실시간 자막에 바로 등장합니다 🎉<br>` +
       `<span style="color:#8b949e;font-size:0.78rem">checkpoint: ${data.checkpoint}</span>`;
+    document.getElementById('enrollLabel').value = '';
+    document.getElementById('enrollFiles').value = '';
+    document.getElementById('enrollFileLabel').textContent = '';
+    refreshClasses();
   } catch (e) {
     err.textContent = '오류: ' + e.message;
   } finally {
@@ -1194,6 +1289,36 @@ async function runEnroll() {
   }
 }
 
+// ── 등록된 동작 목록/초기화 ────────────────────────────────────────────────────
+async function refreshClasses() {
+  try {
+    const res = await fetch('/classes');
+    if (!res.ok) return;
+    const data = await res.json();
+    const wrap = document.getElementById('enrolledWrap');
+    const list = document.getElementById('enrolledList');
+    if (!data.enrolled.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    list.innerHTML = '';
+    for (const c of data.enrolled) {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'background:#0d3321;color:#3fb950;border:1px solid #238636;' +
+        'border-radius:14px;padding:3px 11px;font-size:0.78rem;font-weight:600';
+      chip.textContent = `#${c.id} ${c.label}`;
+      list.appendChild(chip);
+    }
+  } catch (_) {}
+}
+
+async function resetClasses() {
+  if (!confirm('등록한 동작을 모두 지우고 기본 48개로 되돌릴까요?')) return;
+  try {
+    await fetch('/reset_classes', { method: 'POST' });
+    await refreshClasses();
+  } catch (_) {}
+}
+
+refreshClasses();
 loadForgetting();
 </script>
 </body>
