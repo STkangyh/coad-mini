@@ -24,27 +24,21 @@ uvicorn app:app --port 8000
 The `Dockerfile` is Spaces-ready (Docker SDK, port 7860, CLIP weights pre-cached).
 
 1. Create a new Space → **SDK: Docker** → Blank.
-2. Add this front-matter to the Space's `README.md` (Spaces reads it for config):
-
-   ```yaml
-   ---
-   title: coad-mini
-   emoji: ⚡
-   colorFrom: blue
-   colorTo: indigo
-   sdk: docker
-   app_port: 7860
-   ---
-   ```
-
+2. The Space's `README.md` must carry the Spaces config (YAML front-matter). A
+   ready-made one is in this repo at [`deploy/space-README.md`](../deploy/space-README.md) —
+   use it as the Space's `README.md`.
 3. Push this repo (it already contains `Dockerfile`, `app.py`, `src/`,
-   `checkpoints/`) to the Space's git remote:
+   `checkpoints/`) to the Space's git remote, with the Space README in place:
 
    ```bash
    git remote add space https://huggingface.co/spaces/<user>/coad-mini
+   cp deploy/space-README.md README.space.md   # then commit it AS README.md on the space branch
+   # simplest: clone the empty Space, copy repo files in, copy deploy/space-README.md -> README.md, push
    git push space main
    ```
 
+   (The Space needs its `README.md` to be the front-matter version; the GitHub
+   project keeps its own `README.md`, so swap the file when pushing to the Space.)
 4. The Space builds the image and serves the demo. Link it from the GitHub
    Pages landing (`docs/index.html`).
 
