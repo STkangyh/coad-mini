@@ -38,6 +38,9 @@ All reuse the same `CLIP features → GRU → A-GEM` core and are **wired into t
 
 After A-GEM converged, we searched for the next bottleneck. **Data quantity dominates — not architecture:**
 
+![What actually moves the needle](docs/assets/fig_levers.png)
+![Data-scaling curve: CLIP B/32 vs OpenCLIP L/14](docs/assets/fig_data_scale.png)
+
 | Lever | Effect on Avg Acc |
 |---|---|
 | GRU capacity (256→512, +layers) | none / worse |
