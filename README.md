@@ -2,6 +2,10 @@
 
 Compact continual-learning experiments for video action recognition on a 48-class subset of Something-Something V2. The project compares a plain sequential baseline against replay-based mitigation methods, mainly **A-GEM**, using **CLIP ViT-B/32 frame features** and a **GRU classifier**.
 
+![Demo — Baseline vs A-GEM realtime captioning](docs/assets/demo.gif)
+
+> *Realtime captioning demo: **Baseline** (left, red) vs **A-GEM** (right, green) on Something-Something V2, with a live OOD score. A-GEM correctly recognizes actions the sequentially-trained baseline mislabels (e.g. "Folding paper").*
+
 > **📓 연구 일지 (Research Log)** — 실험 설계부터 최종 결과까지, 코드에 담기지 않은 의사결정 과정을 기록했습니다.  
 > OrthGrad 가설 → 실패 → A-GEM 전환 → Scaling → Ablation → Demo 까지의 흐름을 담고 있습니다.  
 > → **[docs/research_log.md](docs/research_log.md)**
