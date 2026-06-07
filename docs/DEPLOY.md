@@ -42,6 +42,28 @@ The `Dockerfile` is Spaces-ready (Docker SDK, port 7860, CLIP weights pre-cached
 4. The Space builds the image and serves the demo. Link it from the GitHub
    Pages landing (`docs/index.html`).
 
+### Large files (checkpoints) must use Git LFS
+
+HF rejects raw binaries (`Your push was rejected because it contains binary files`).
+The `.pt` checkpoints must be tracked with Git LFS **before** pushing to the Space:
+
+```bash
+git lfs install
+git lfs track "*.pt"          # writes .gitattributes
+git add .gitattributes checkpoints/*.pt
+git commit -m "track checkpoints with LFS"
+git push
+```
+
+If they were already committed as plain blobs, rewrite first:
+`git lfs migrate import --include="*.pt"` then `git lfs ls-files` to confirm, then push.
+(Alternatively, skip git entirely: `hf upload <user>/coad-mini . --repo-type=space`.)
+
+### Updating a deployed Space
+
+The Space is a separate git repo — pushing to GitHub does **not** update it.
+Re-copy the changed files into the Space checkout (or re-run `hf upload`) and push again.
+
 ### Notes
 - **Webcam** requires HTTPS (Spaces provides it; on localhost it also works).
 - **Enrolled actions** (`/enroll`) are written to `checkpoints/agem_enrolled.pt`

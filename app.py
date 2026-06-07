@@ -88,7 +88,7 @@ def get_clip():
             _clip_preprocess = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
             _clip_model.eval()
         except Exception as e:
-            raise HTTPException(500, f"CLIP 로드 실패: {e}")
+            raise HTTPException(500, f"CLIP load failed: {e}")
     return _clip_model, _clip_preprocess
 
 
@@ -97,7 +97,7 @@ def extract_frames_from_video(video_bytes: bytes, n_frames: int = N_FRAMES) -> n
     try:
         from PIL import Image
     except ImportError:
-        raise HTTPException(500, "pip install Pillow 필요")
+        raise HTTPException(500, "Pillow is required (pip install Pillow)")
 
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(video_bytes)
@@ -134,7 +134,7 @@ def extract_frames_from_video(video_bytes: bytes, n_frames: int = N_FRAMES) -> n
     Path(tmp_path).unlink(missing_ok=True)
 
     if len(frames) < 2:
-        raise HTTPException(400, "영상에서 프레임 추출 실패. webm/mp4 형식인지 확인하세요.")
+        raise HTTPException(400, "Failed to extract frames from the video. Check that it is webm/mp4.")
 
     # 부족한 경우 마지막 프레임 반복
     while len(frames) < n_frames:
@@ -190,7 +190,7 @@ def frames_to_feature(frames_b64: list[str]) -> torch.Tensor:
     try:
         from PIL import Image
     except ImportError:
-        raise HTTPException(500, "pip install Pillow 필요")
+        raise HTTPException(500, "Pillow is required (pip install Pillow)")
 
     clip_model, processor = get_clip()
     imgs = []
@@ -301,14 +301,14 @@ async def predict_action(file: UploadFile = File(...)):
 
     video_bytes = await file.read()
     if len(video_bytes) == 0:
-        raise HTTPException(400, "빈 파일")
+        raise HTTPException(400, "Empty file")
 
     try:
         feat = video_to_feature(video_bytes)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"feature 추출 실패: {e}")
+        raise HTTPException(500, f"Feature extraction failed: {e}")
 
     return JSONResponse({
         "filename": file.filename,
@@ -331,14 +331,14 @@ async def predict_realtime(payload: RTPayload):
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready")
     if len(payload.frames) == 0:
-        raise HTTPException(400, "frames 없음")
+        raise HTTPException(400, "No frames")
 
     try:
         feat = frames_to_feature(payload.frames)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"feature 추출 실패: {e}")
+        raise HTTPException(500, f"Feature extraction failed: {e}")
 
     # 실시간이므로 top-1만 반환 (속도 우선)
     def top1(model):
@@ -377,9 +377,9 @@ async def enroll_new_class(
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready — run save_checkpoints.py first")
     if not label or not label.strip():
-        raise HTTPException(400, "label 이 비어 있습니다")
+        raise HTTPException(400, "Label is empty")
     if not files:
-        raise HTTPException(400, "최소 1개 영상이 필요합니다")
+        raise HTTPException(400, "At least one video is required")
 
     label = label.strip()
 
@@ -394,11 +394,11 @@ async def enroll_new_class(
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(500, f"feature 추출 실패 ({f.filename}): {e}")
+            raise HTTPException(500, f"Feature extraction failed ({f.filename}): {e}")
         new_windows.append(feat.squeeze(0))        # (16, 512)
 
     if not new_windows:
-        raise HTTPException(400, "유효한 영상이 없습니다")
+        raise HTTPException(400, "No valid videos")
 
     # 2. 모델 확장 (현재 A-GEM 모델의 deepcopy 로 작업)
     import copy
@@ -541,14 +541,14 @@ async def predict_anomaly(payload: RTPayload):
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready")
     if len(payload.frames) == 0:
-        raise HTTPException(400, "frames 없음")
+        raise HTTPException(400, "No frames")
 
     try:
         feat = frames_to_feature(payload.frames)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"feature 추출 실패: {e}")
+        raise HTTPException(500, f"Feature extraction failed: {e}")
 
     # 단발 추론이므로 temporal smoothing 미사용(smooth=False)
     result = _anomaly_scorer.score_window(_gem_model, feat, smooth=False)
