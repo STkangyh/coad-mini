@@ -573,7 +573,7 @@ def index():
 
 
 HTML_PAGE = """<!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -664,17 +664,17 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <!-- 업로드 -->
   <div class="card">
-    <h2>📹 영상 업로드</h2>
-    <!-- 업로드 전: 드롭존 -->
+    <h2>📹 Upload video</h2>
+    <!-- before upload: dropzone -->
     <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <input type="file" id="fileInput" accept="video/*,.webm,.mp4,.avi">
       <div class="icon">🎬</div>
-      <div class="hint">클릭하거나 영상을 끌어다 놓으세요<br>webm · mp4 · avi 지원</div>
+      <div class="hint">Click or drag &amp; drop a video<br>webm · mp4 · avi</div>
       <div class="filename" id="filenameLabel"></div>
     </div>
-    <!-- 웹캠 라이브 -->
+    <!-- live webcam -->
     <button class="btn" id="webcamBtn" onclick="startWebcam()"
-            style="background:#1f6feb;margin-top:10px">📷 웹캠으로 실시간 데모</button>
+            style="background:#1f6feb;margin-top:10px">📷 Live webcam demo</button>
     <!-- 업로드 후: 인라인 플레이어 + 자막 오버레이 -->
     <div id="videoWrap" style="display:none;margin-top:12px;border-radius:8px;
          overflow:hidden;background:#000;position:relative;user-select:none">
@@ -717,12 +717,12 @@ HTML_PAGE = """<!DOCTYPE html>
         <button id="rtBtn" onclick="toggleRT()"
                 style="background:rgba(88,166,255,0.85);color:#fff;border:none;
                        border-radius:6px;padding:4px 10px;font-size:0.8rem;cursor:pointer">
-          ▶ 실시간 자막
+          ▶ Live captions
         </button>
         <button onclick="resetUpload()"
                 style="background:rgba(0,0,0,0.6);color:#fff;border:none;
                        border-radius:6px;padding:4px 10px;font-size:0.8rem;cursor:pointer">
-          ✕ 다시 선택
+          ✕ Reset
         </button>
       </div>
       <canvas id="captureCanvas" style="display:none"></canvas>
@@ -732,43 +732,43 @@ HTML_PAGE = """<!DOCTYPE html>
     <div id="timelineWrap" style="display:none;margin-top:10px">
       <div style="font-size:0.75rem;color:#8b949e;margin-bottom:6px;
                   display:flex;align-items:center;gap:6px">
-        ⏱ 행동 변화 타임라인
+        ⏱ Action timeline
         <span style="font-size:0.68rem;color:#484f58">
-          (A-GEM 예측이 바뀔 때마다 기록)
+          (logged when the A-GEM prediction changes)
         </span>
       </div>
       <div id="timelineTrack" style="display:flex;gap:4px;flex-wrap:wrap;
            max-height:90px;overflow-y:auto;align-content:flex-start"></div>
     </div>
     <button class="btn" id="predictBtn" disabled onclick="runPredict()">
-      🔍 Baseline vs A-GEM 예측
+      🔍 Predict (Baseline vs A-GEM)
     </button>
     <div class="error" id="errorMsg"></div>
   </div>
 
   <!-- 예측 결과 -->
   <div class="card" id="resultCard" style="display:none">
-    <h2>🎯 예측 결과 <span id="resultFilename" style="font-weight:400;color:#8b949e;font-size:0.8rem"></span></h2>
+    <h2>🎯 Prediction <span id="resultFilename" style="font-weight:400;color:#8b949e;font-size:0.8rem"></span></h2>
     <div class="result-grid" id="resultGrid"></div>
   </div>
 
   <!-- 새 동작 등록 (few-shot) -->
   <div class="card">
-    <h2>➕ 새 동작 등록 <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(few-shot · A-GEM)</span></h2>
+    <h2>➕ Enroll a new action <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(few-shot · A-GEM)</span></h2>
     <p style="font-size:0.82rem;color:#8b949e;margin-bottom:12px">
-      새 행동 클래스를 예시 영상 몇 개로 즉석 등록합니다.
-      기존 48개 클래스를 잊지 않고(A-GEM replay) 49번째(+)를 추가해요.
+      Teach a brand-new action class from a few example clips.
+      A-GEM replay adds the (49th+) class without forgetting the existing 48.
     </p>
-    <input id="enrollLabel" type="text" placeholder="새 동작 이름 (예: 손 흔들기)"
+    <input id="enrollLabel" type="text" placeholder="New action name (e.g. waving)"
            style="width:100%;padding:11px 12px;border:1px solid #30363d;border-radius:8px;
                   background:#0d1117;color:#e6edf3;font-size:0.95rem;margin-bottom:12px">
     <div class="upload-area" id="enrollDrop" onclick="document.getElementById('enrollFiles').click()">
       <input type="file" id="enrollFiles" accept="video/*,.webm,.mp4,.avi" multiple>
       <div class="icon">📥</div>
-      <div class="hint">예시 영상 1개 이상 선택 (여러 개 가능)</div>
+      <div class="hint">Select one or more example videos</div>
       <div class="filename" id="enrollFileLabel"></div>
     </div>
-    <button class="btn" id="enrollBtn" onclick="runEnroll()">➕ 등록</button>
+    <button class="btn" id="enrollBtn" onclick="runEnroll()">➕ Enroll</button>
     <div class="error" id="enrollError"></div>
     <div id="enrollResult" style="display:none;margin-top:12px;padding:12px;
          background:#0d3321;border-left:3px solid #3fb950;border-radius:8px;
@@ -777,9 +777,9 @@ HTML_PAGE = """<!DOCTYPE html>
     <!-- 등록된 동작 목록 -->
     <div id="enrolledWrap" style="display:none;margin-top:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:0.8rem;color:#8b949e">🧩 내가 등록한 동작</span>
+        <span style="font-size:0.8rem;color:#8b949e">🧩 My enrolled actions</span>
         <button onclick="resetClasses()" style="background:#21262d;color:#f85149;border:1px solid #30363d;
-                border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer">전체 초기화</button>
+                border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer">Reset all</button>
       </div>
       <div id="enrolledList" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
@@ -787,9 +787,9 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <!-- Forgetting 곡선 -->
   <div class="card">
-    <h2>📉 Forgetting 곡선 <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(Stage 1 accuracy over stages)</span></h2>
+    <h2>📉 Forgetting curve <span style="font-weight:400;color:#8b949e;font-size:0.8rem">(Stage 1 accuracy over stages)</span></h2>
     <div id="chartContainer">
-      <div class="spinner">데이터 로딩 중...</div>
+      <div class="spinner">Loading…</div>
     </div>
     <div class="stats-row" id="statsRow"></div>
   </div>
@@ -823,7 +823,7 @@ async function startWebcam() {
     webcamStream = await navigator.mediaDevices.getUserMedia({
       video: { width: 480, height: 480 }, audio: false });
   } catch (e) {
-    document.getElementById('errorMsg').textContent = '웹캠 접근 실패: ' + e.message;
+    document.getElementById('errorMsg').textContent = 'Webcam access failed: ' + e.message;
     return;
   }
   stopRT();
@@ -965,7 +965,7 @@ function updateAnomaly(d) {
   if (d.is_anomaly) {
     chip.style.background = 'rgba(248,81,73,0.92)';
     chip.style.color = '#fff';
-    chip.innerHTML = '⚠ 학습되지 않은 동작? <span id="anomalyScoreText">' + score + '</span>';
+    chip.innerHTML = '⚠ Unknown action? <span id="anomalyScoreText">' + score + '</span>';
   } else {
     chip.style.background = 'rgba(40,50,70,0.85)';
     chip.style.color = '#c9d1d9';
@@ -1073,7 +1073,7 @@ function startRT() {
   predHistory    = { baseline: [], agem: [] };
   lastGemLabel   = null;
 
-  document.getElementById('rtBtn').textContent = '⏹ 자막 중지';
+  document.getElementById('rtBtn').textContent = '⏹ Stop captions';
   document.getElementById('rtBtn').style.background = 'rgba(248,81,73,0.85)';
   document.getElementById('subtitleOverlay').style.display = 'block';
   document.getElementById('timelineWrap').style.display = 'block';
@@ -1089,7 +1089,7 @@ function stopRT() {
   rtTimer  = null;
   const btn = document.getElementById('rtBtn');
   if (btn) {
-    btn.textContent = '▶ 실시간 자막';
+    btn.textContent = '▶ Live captions';
     btn.style.background = 'rgba(88,166,255,0.85)';
   }
 }
@@ -1103,7 +1103,7 @@ async function runPredict() {
   if (!f) return;
 
   predictBtn.disabled = true;
-  predictBtn.textContent = '⏳ 분석 중...';
+  predictBtn.textContent = '⏳ Analyzing…';
   document.getElementById('errorMsg').textContent = '';
   document.getElementById('resultCard').style.display = 'none';
   document.getElementById('resultFilename').textContent = f.name;
@@ -1120,10 +1120,10 @@ async function runPredict() {
     const data = await res.json();
     renderResults(data);
   } catch (e) {
-    document.getElementById('errorMsg').textContent = '오류: ' + e.message;
+    document.getElementById('errorMsg').textContent = 'Error: ' + e.message;
   } finally {
     predictBtn.disabled = false;
-    predictBtn.textContent = '🔍 Baseline vs A-GEM 예측';
+    predictBtn.textContent = '🔍 Predict (Baseline vs A-GEM)';
   }
 }
 
@@ -1171,7 +1171,7 @@ async function loadForgetting() {
   try {
     const res = await fetch('/forgetting');
     if (!res.ok) {
-      container.innerHTML = '<div class="error">체크포인트 없음 — save_checkpoints.py 실행 필요</div>';
+      container.innerHTML = '<div class="error">No checkpoints — run save_checkpoints.py</div>';
       return;
     }
     const data = await res.json();
@@ -1242,7 +1242,7 @@ async function loadForgetting() {
     `;
 
   } catch (e) {
-    container.innerHTML = `<div class="error">로드 실패: ${e.message}</div>`;
+    container.innerHTML = `<div class="error">Load failed: ${e.message}</div>`;
   }
 }
 
@@ -1250,7 +1250,7 @@ async function loadForgetting() {
 document.getElementById('enrollFiles').addEventListener('change', () => {
   const fs = document.getElementById('enrollFiles').files;
   document.getElementById('enrollFileLabel').textContent =
-    fs.length ? `✓ ${fs.length}개 선택됨` : '';
+    fs.length ? `✓ ${fs.length} selected` : '';
 });
 
 async function runEnroll() {
@@ -1261,10 +1261,10 @@ async function runEnroll() {
   const btn   = document.getElementById('enrollBtn');
   err.textContent = ''; out.style.display = 'none';
 
-  if (!label)        { err.textContent = '동작 이름을 입력하세요'; return; }
-  if (!files.length) { err.textContent = '예시 영상을 1개 이상 선택하세요'; return; }
+  if (!label)        { err.textContent = 'Enter an action name'; return; }
+  if (!files.length) { err.textContent = 'Select at least one example video'; return; }
 
-  btn.disabled = true; btn.textContent = '⏳ 등록 중...';
+  btn.disabled = true; btn.textContent = '⏳ Enrolling…';
   const fd = new FormData();
   fd.append('label', label);
   for (const f of files) fd.append('files', f);
@@ -1275,17 +1275,17 @@ async function runEnroll() {
     if (!res.ok) throw new Error(data.detail || res.statusText);
     out.style.display = 'block';
     out.innerHTML =
-      `✅ '<b>${data.label}</b>' 등록 완료 — class #${data.new_class_id}, 총 ${data.n_classes}개 클래스 ` +
-      `(예시 ${data.n_examples}개) — 실시간 자막에 바로 등장합니다 🎉<br>` +
+      `✅ Enrolled '<b>${data.label}</b>' — class #${data.new_class_id}, ${data.n_classes} classes total ` +
+      `(${data.n_examples} examples). It now appears in the live caption 🎉<br>` +
       `<span style="color:#8b949e;font-size:0.78rem">checkpoint: ${data.checkpoint}</span>`;
     document.getElementById('enrollLabel').value = '';
     document.getElementById('enrollFiles').value = '';
     document.getElementById('enrollFileLabel').textContent = '';
     refreshClasses();
   } catch (e) {
-    err.textContent = '오류: ' + e.message;
+    err.textContent = 'Error: ' + e.message;
   } finally {
-    btn.disabled = false; btn.textContent = '➕ 등록';
+    btn.disabled = false; btn.textContent = '➕ Enroll';
   }
 }
 
@@ -1311,7 +1311,7 @@ async function refreshClasses() {
 }
 
 async function resetClasses() {
-  if (!confirm('등록한 동작을 모두 지우고 기본 48개로 되돌릴까요?')) return;
+  if (!confirm('Remove all enrolled actions and revert to the base 48?')) return;
   try {
     await fetch('/reset_classes', { method: 'POST' });
     await refreshClasses();
