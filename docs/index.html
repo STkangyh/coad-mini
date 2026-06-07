@@ -90,10 +90,14 @@
     <section class="card">
       <h2>Applications (built on the same pipeline)</h2>
       <ul>
-        <li><strong>Realtime captioning</strong> — streaming per-window action prediction overlaid on video (<code>/predict_rt</code>)</li>
-        <li><strong>Few-shot enrollment</strong> — register a brand-new action class (48 → 48+K) via A-GEM replay, without catastrophic forgetting (<code>/enroll</code>) — <a href="few_shot_enrollment.md">docs</a></li>
+        <li><strong>Realtime captioning</strong> — streaming action prediction over an uploaded video <em>or live webcam</em> (<code>/predict_rt</code>)</li>
+        <li><strong>Few-shot enrollment (continual-learning loop)</strong> — teach a brand-new action from a few clips; it hot-swaps into the live model instantly, without forgetting the rest (<code>/enroll</code>) — <a href="few_shot_enrollment.md">docs</a></li>
         <li><strong>Anomaly / OOD detection</strong> — flag out-of-distribution / low-confidence actions on the stream (<code>/predict_anomaly</code>) — <a href="anomaly_detection.md">docs</a></li>
       </ul>
+      <p class="muted" style="margin-top:12px">
+        The demo above is interactive when self-hosted — run <code>uvicorn app:app</code> or the
+        included <code>Dockerfile</code> (Hugging Face Spaces-ready). See <a href="DEPLOY.md">deploy guide</a>.
+      </p>
     </section>
 
     <section class="card">

@@ -21,11 +21,13 @@ Compact continual-learning experiments for video action recognition on a 48-clas
 
 ## Applications
 
-All three reuse the same `CLIP features → GRU → A-GEM` core and are **wired into the FastAPI demo UI** (`GET /`):
+All reuse the same `CLIP features → GRU → A-GEM` core and are **wired into the FastAPI demo UI** (`GET /`):
 
-- **Realtime captioning** — streaming per-window action prediction overlaid on the video (`POST /predict_rt`).
+- **Realtime captioning** — streaming per-window action prediction overlaid on an **uploaded video or a live webcam** (`POST /predict_rt`).
 - **Anomaly / novel-action (OOD) detection** — an OOD-score badge on the realtime stream (turns red when an action looks out-of-distribution). Scoring (max-softmax-prob / entropy / energy) uses one convention — **higher score == more OOD** — with a calibrated threshold + temporal smoothing (`POST /predict_anomaly`). Calibrate: `python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`. Details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
-- **Few-shot enrollment** — a UI panel (label + example videos) to register a brand-new action class (48 → 48+K) via A-GEM replay, without catastrophic forgetting (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
+- **Few-shot enrollment (continual-learning loop)** — a UI panel (label + example videos) registers a brand-new action class (48 → 48+K) via A-GEM replay without catastrophic forgetting, then **hot-swaps the serving model so the new action appears in the live caption immediately** and persists across restarts. Manage/reset enrolled actions via `GET /classes` · `POST /reset_classes` (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
+
+**Run the live demo:** `uvicorn app:app --port 8000`, or containerized via the included `Dockerfile` (Hugging Face Spaces-ready). See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Key findings
 
@@ -128,7 +130,9 @@ Endpoints:
 - `POST /predict` - upload a video file
 - `POST /predict_rt` - realtime frame-based inference
 - `POST /predict_anomaly` - realtime inference + OOD/anomaly score
-- `POST /enroll` - few-shot register a new action class (multipart: `label` + `files`)
+- `POST /enroll` - few-shot register a new action class (multipart: `label` + `files`); hot-swaps the live model
+- `GET /classes` - list base + enrolled classes
+- `POST /reset_classes` - remove enrolled actions, revert to the base 48
 
 ### 2. Recreate the mini subset manifests
 
