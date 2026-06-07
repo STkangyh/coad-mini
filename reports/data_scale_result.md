@@ -18,6 +18,8 @@ fractions = 0.25, 0.5, 1.0
 
 ## 결과 (Avg Acc, 3-seed mean ± std)
 
+![Data-scaling curve](../docs/assets/fig_data_scale.png)
+
 | 데이터 | B/32 (512d) | L/14 (768d) | Δ (L14−B32) |
 |---|---|---|---|
 | 25%  | 0.314 ± 0.009 | 0.339 ± 0.008 | **+0.026** |
