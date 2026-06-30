@@ -26,6 +26,7 @@ import torch.nn as nn
 
 from src.models.gru_detector import GRUDetector
 from src.models.gru_attention import GRUAttentionDetector
+from src.models.ssm_detector import SSMDetector
 from src.trainer import load_samples, set_seed, train_epoch
 from src.utils.gem import AGEM
 
@@ -50,7 +51,7 @@ class ExperimentConfig:
     dropout: float = 0.0
     bidirectional: bool = False
     selection: str = "balanced"
-    arch: str = "gru"          # "gru" -> GRUDetector | "attn" -> GRUAttentionDetector
+    arch: str = "gru"          # "gru" -> GRUDetector | "attn" -> GRUAttentionDetector | "ssm" -> SSMDetector
     num_heads: int = 4         # only used when arch == "attn"
 
 
@@ -67,6 +68,8 @@ CONFIGS = [
     ),
     ExperimentConfig("attn_h256", hidden_dim=256, arch="attn"),
     ExperimentConfig("attn_h512", hidden_dim=512, arch="attn"),
+    ExperimentConfig("ssm_h256", hidden_dim=256, arch="ssm", num_layers=2),
+    ExperimentConfig("ssm_h512", hidden_dim=512, arch="ssm", num_layers=2),
 ]
 
 
@@ -106,6 +109,15 @@ def make_model(config: ExperimentConfig, feature_dim: int) -> nn.Module:
             dropout=config.dropout,
             bidirectional=config.bidirectional,
             num_heads=config.num_heads,
+        ).to(device)
+    if config.arch == "ssm":
+        return SSMDetector(
+            feature_dim=feature_dim,
+            hidden_dim=config.hidden_dim,
+            num_classes=N_CLASSES,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            bidirectional=config.bidirectional,
         ).to(device)
     return GRUDetector(
         feature_dim=feature_dim,
