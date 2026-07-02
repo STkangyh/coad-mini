@@ -70,6 +70,8 @@ CONFIGS = [
     ExperimentConfig("attn_h512", hidden_dim=512, arch="attn"),
     ExperimentConfig("ssm_h256", hidden_dim=256, arch="ssm", num_layers=2),
     ExperimentConfig("ssm_h512", hidden_dim=512, arch="ssm", num_layers=2),
+    ExperimentConfig("gru_h128", hidden_dim=128),   # downward capacity ablation
+    ExperimentConfig("gru_h64", hidden_dim=64),
 ]
 
 
