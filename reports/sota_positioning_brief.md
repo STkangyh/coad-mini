@@ -44,6 +44,11 @@
 **벤치마크:** Something-Something V2의 48-class 부분집합, 8 스테이지(6클래스/스테이지).
 - **클래스 선정 기준(확정):** 무작위/빈도가 아니라 **8 stage × 6 class 의미론적 큐레이션** — S1 Open/Close, S2 Container, S3 수직·깊이 이동, S4 수평 push/pull, S5 Cover/Throw/Drop, S6 Push-force/Hit/Tear, S7 Lift/Drop/Fall, S8 Pretend/Show. 클래스당 인스턴스는 seed 고정 `random.sample` 100개씩(총 4800 train). → cherry-pick이 아니라 **난이도가 올라가는 커리큘럼형 CL 구조**.
 
+**학습 세팅 — initial vs continual (코드 확인, 확정):**
+- **Stage 1 = initial training**: 6 클래스(전체의 12.5%), A-GEM 메모리가 비어있어(`gem._memory==[]`) `precompute_ref`가 `g_ref=None`을 반환 → `apply()`가 no-op → **순수 cross-entropy, replay 없음**. 진짜 "처음 배우는" 단계.
+- **Stage 2~8 = continual training**: 나머지 42 클래스(87.5%), 7개 스테이지 × 6클래스. 매 스테이지 종료 시 `gem.add_stage()`가 해당 스테이지에서 balanced 50개를 replay 메모리에 추가 → 이후 스테이지들은 **그때까지 학습한 모든 이전 클래스**에 대해 growing replay 메모리(스테이지당 mem=50, epoch당 replay_ratio=0.25 서브샘플)로 A-GEM 보호를 받으며 학습.
+- 요약: **초기 6클래스 : 지속 42클래스 = 1 : 7 스테이지** (12.5% : 87.5%). (`experiments/run_capacity_ablation.py::run_one`, `src/utils/gem.py::precompute_ref/apply`)
+
 **지표 정의(중요 — 정정됨):** 평가는 **stage 내부 6-way, task-aware**임 (`eval_stage`가 해당 stage의 6개 class로 argmax를 제한). 즉 **테스트 시 stage/task ID가 주어지는 task-incremental 세팅**이고 **chance = 1/6 ≈ 16.7%** (❌ 1/48=2.1% 아님). "평균정확도 ~0.40" = 8개 stage-group의 6-way 정확도를 **최종 stage 학습 후 평균**. S1 forgetting = stage1의 6-way 정확도 (stage1 직후 → 전체 학습 후) 하락폭. **⚠️ 이 때문에 우리 수치를 class-IL SOTA(vCLIMB, 전체 클래스 대상)와 직접 비교 불가 — task-IL이 더 쉬움. 미팅에서 반드시 정직하게 밝힐 것.** +14.1%p는 동일 스택 A-GEM 유/무 비교.
 
 **핵심 결과 (5 seeds, B/32, 실측·±std 확보):**
@@ -58,6 +63,20 @@
 - **A-GEM vs plain ER: +4.1%p** — 즉 **우리 셋업(frozen CLIP + task-aware)에선 A-GEM이 ER을 이김.** (`dev/run_er_comparison.py`)
 
 **명확히 짚을 점 — A-GEM은 2019 클래식 baseline이지 정확도 SOTA는 아님.** *표준* class-IL 벤치(Seq-CIFAR 등)에선 ER/DER++/ER-ACE·prompt 계열에 밀립니다. 다만 **우리 task-aware·frozen-CLIP 세팅에서는 위 실측처럼 A-GEM이 plain ER보다 강했고**, 우리가 A-GEM을 쓰는 이유는 정확도 챔피언이어서가 아니라 **상수 메모리·single-pass 온라인 제약**이라는 효율 성질 때문입니다. 핵심: 강한 frozen feature 위에서는 약한 anti-forgetting으로도 충분.
+
+**정밀 지표 (val 4702개, precision/recall/F1/mAP, 두 평가체제 동시 산출) — `dev/compute_val_metrics.py` / `reports/val_metrics_result.md`:**
+
+| Regime | Metric | Baseline | A-GEM | Δ |
+|---|---|---|---|---|
+| **Full 48-way** (진짜 class-IL, task ID 없음, chance 2.1%) | Accuracy | 0.062 | 0.099 | +0.037 |
+| Full 48-way | mAP | 0.043 | 0.104 | **+0.060** |
+| Full 48-way | F1 (macro) | **0.015** | 0.068 | +0.053 |
+| Task-aware 6-way (chance 16.7%) | Accuracy | 0.230 | 0.363 | +0.133 |
+| Task-aware 6-way | F1 (macro) | 0.163 | 0.353 | +0.190 |
+
+- **가장 중요한 정직성 포인트:** task ID를 안 주는 **진짜 class-IL(full 48-way)로 평가하면 정확도가 훨씬 낮아짐**(23%→6.2%, 36%→9.9%). Task-aware 수치만 보고하면 과대평가 — 미팅에서 이 낙차를 먼저 보여줄 것.
+- **그래도 A-GEM의 상대적 우위는 두 체제 모두에서 유지**됨(오히려 mAP는 어려운 체제에서 격차 2.4배로 더 벌어짐).
+- **baseline의 F1(macro)가 0.015로 붕괴**하는 게 catastrophic forgetting의 전형적 지문 — 순차학습이 최근 배운 클래스로 예측을 몰아주면서(accuracy는 chance의 3배지만 클래스별 재현은 거의 실패) 망각을 시각적으로도 증명. A-GEM은 이 붕괴를 0.068로 완화(그래도 낮음 — 진짜 class-IL은 여전히 어려운 문제임을 정직하게 인정).
 
 ---
 
@@ -129,6 +148,20 @@
 **Q7. 48-class subset은 어떻게 골랐나? cherry-pick 아닌가?**
 빈도/방법-유리가 아니라 **8 stage × 6 class 의미론적 큐레이션**(Open/Close→…→Pretend/Show, 난이도 상승 커리큘럼). 클래스당 인스턴스는 seed 고정 random.sample 100개. 특정 방법에 유리하게 고른 게 아님.
 
+**Q8. A-GEM의 이득이 그냥 "버퍼(메모리)가 있어서"인 거 아닌가? 알고리즘이 진짜 기여하나?**
+**직접 검증함 — GDumb(버퍼만 균형있게 관리 + 매 스테이지 처음부터 재학습, 알고리즘 없음)을 실측**한 결과
+0.164(±0.004)로 **거의 정확히 chance(0.167) 수준**이고 **baseline(0.251)보다도 낮음**. 즉 버퍼가
+있다는 사실 자체는 이득을 만들지 않고, **gradient projection(A-GEM)이라는 알고리즘이 실제 가치를
+더함**(0.387, GDumb 대비 +0.223). 반론이 우리 데이터로 명확히 반증됨.
+
+**Q9. 이 프로젝트에서 뭘 개선했나? 정확도 숫자만 계속 만지고 있나?**
+아님 — capacity/backbone/attention/SSM/데이터스케일/ER/GDumb까지 폭넓게 통제 실험한 뒤, **더 이상 새
+알고리즘을 얹는 게 한계효용이 낮다고 판단해 방향을 실사용 품질로 전환**했습니다. 실제로 데모를 써보다가
+**OOD 이상탐지 배지가 기본 설정에서는 threshold가 계산되지 않아 한 번도 작동하지 않는 버그**를 발견 →
+서버 시작 시 자동 보정(로컬은 실제 val feature로, Docker/HF Spaces처럼 데이터가 없는 배포 환경에서는
+synthetic in-distribution 샘플로 폴백)하도록 고쳤고, held-out 데이터로 보정 유효성(목표 FPR 5% vs 실측
+4%)까지 확인했습니다. "더 정확하게" 보다 "실제로 동작하게"를 우선한 사례.
+
 ---
 
 ## 빈칸 체크리스트 — 대부분 실측 완료 (`reports/measured_evidence.md`)
@@ -139,8 +172,11 @@
 4. ⬜ **few-shot enrollment 소규모 측정** — 아직(데모 능력). 클립 수→신규정확도/기존망각 수치화는 후속.
 5. ✅ **하향 절제** — GRU 256→128 무손실(0.388→0.387), h64서 하락. 용량 양방향 무병목.
 6. ✅ **48-class 선정 기준** — 8×6 의미론적 큐레이션 커리큘럼.
-7. ✅ **지표 정의** — task-aware 6-way, **chance 1/6 ≈ 0.167** (task-incremental).
-8. ⬜ **GDumb/무제약버퍼 상한** — 후속 과제(선택).
+7. ✅ **지표 정의** — task-aware 6-way, **chance 1/6 ≈ 0.167** (task-incremental). 진짜 class-IL(48-way, task ID 없음) 수치도 실측: baseline 6.2%/A-GEM 9.9%.
+8. ✅ **GDumb(버퍼 효과 반론 검증)** — GDumb 0.164±0.004 ≈ chance(0.167), baseline(0.251)보다도 낮음. "CL 이득=버퍼 효과" 반론 반증됨. (`dev/run_gdumb_comparison.py`, `reports/post_agem_methods_comparison.md`)
+9. ✅ **정밀 지표(precision/recall/F1/mAP)** — `reports/val_metrics_result.md`.
+10. ✅ **학습 세팅(initial vs continual)** — Stage1=6클래스 initial(replay 없음) : Stage2-8=42클래스 continual(growing A-GEM replay) = 1:7.
+11. ✅ **데모 앱 사용성 버그 수정** — OOD 배지가 기본 설정에선 `threshold=None`이라 **항상 미작동**이었음(사용해보다 발견). 앱 시작 시 자동 보정(real val feature 또는 Docker/Spaces용 synthetic fallback)으로 수정, calibration 유효성 검증(held-out ID FPR 4%≈목표 5%, feature-space OOD 42% 플래그). 회귀 테스트 추가.
 
 ---
 
