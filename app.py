@@ -244,8 +244,14 @@ else:
 
 # ── Anomaly / OOD detector ────────────────────────────────────────────────────
 # Higher anomaly score == more out-of-distribution (see src/anomaly/detector.py).
-# Threshold can be calibrated offline via experiments/calibrate_anomaly.py;
-# ANOMALY_THRESHOLD env var overrides the conservative built-in default.
+# ANOMALY_THRESHOLD env var, if set, overrides everything below.
+#
+# BUGFIX: previously, with no env var set (the default `uvicorn app:app` /
+# Docker path), `threshold` stayed None forever and `/predict_anomaly` /
+# `is_anomaly` in the UI badge NEVER fired — the feature silently did nothing
+# out of the box. We now auto-calibrate at startup: real val features if
+# present (local dev), else synthetic in-distribution windows (Docker/Spaces,
+# where data/ isn't shipped) so the badge is functional either way.
 import os as _os
 _ANOMALY_METRIC = _os.environ.get("ANOMALY_METRIC", "energy")
 _anomaly_thr_env = _os.environ.get("ANOMALY_THRESHOLD")
@@ -255,6 +261,45 @@ _anomaly_scorer = AnomalyScorer(
     smoothing="ema",
     ema_alpha=0.5,
 )
+
+
+def _auto_calibrate_anomaly(scorer: AnomalyScorer, model, target_fpr: float = 0.05) -> str:
+    """Set scorer.threshold from real val features if available, else synthetic
+    in-distribution windows. Returns a short string describing the source."""
+    real_dir = Path("data/features/val")
+    real_files = sorted(real_dir.glob("*.npy"))[:300] if real_dir.exists() else []
+    scores = []
+    if real_files:
+        with torch.no_grad():
+            for p in real_files:
+                x = torch.tensor(np.load(p), dtype=torch.float32).unsqueeze(0)
+                logits, _ = model(x, None)
+                scores.append(scorer.score_logits(logits))
+        source = f"real val features (n={len(scores)})"
+    else:
+        from experiments.calibrate_anomaly import synthetic_in_dist_windows
+        rng = np.random.default_rng(0)
+        windows = synthetic_in_dist_windows(300, model.feature_dim, rng)
+        with torch.no_grad():
+            for w in windows:
+                x = torch.tensor(w, dtype=torch.float32).unsqueeze(0)
+                logits, _ = model(x, None)
+                scores.append(scorer.score_logits(logits))
+        source = f"synthetic in-distribution windows (n={len(scores)}, no data/ shipped)"
+    scorer.calibrate(scores, target_fpr=target_fpr)
+    return source
+
+
+if _anomaly_thr_env:
+    print(f"✓ Anomaly threshold from ANOMALY_THRESHOLD env: {_anomaly_scorer.threshold}")
+elif _gem_model is not None:
+    try:
+        _src = _auto_calibrate_anomaly(_anomaly_scorer, _gem_model)
+        print(f"✓ Anomaly threshold auto-calibrated: {_anomaly_scorer.threshold:.3f} "
+              f"(metric={_ANOMALY_METRIC}, target_fpr=0.05, source={_src})")
+    except Exception as e:
+        print(f"⚠ Anomaly auto-calibration failed ({e}); OOD badge will not fire until "
+              f"ANOMALY_THRESHOLD is set or experiments/calibrate_anomaly.py is run.")
 
 
 # ── 라우트 ─────────────────────────────────────────────────────────────────────

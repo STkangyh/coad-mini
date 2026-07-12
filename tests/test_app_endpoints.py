@@ -34,3 +34,13 @@ def test_reset_classes_returns_to_base():
     assert r.json()["n_classes"] == 48
     # after reset there should be no enrolled classes
     assert client.get("/classes").json()["enrolled"] == []
+
+
+def test_anomaly_threshold_auto_calibrated():
+    """Regression test: without ANOMALY_THRESHOLD set, the OOD badge used to
+    never fire because the scorer's threshold stayed None forever. Startup
+    auto-calibration (real val features, or synthetic fallback with no data/)
+    must leave a real threshold set whenever checkpoints are ready."""
+    assert app._gem_model is not None, "checkpoints must be ready for this test"
+    assert app._anomaly_scorer.threshold is not None
+    assert isinstance(app._anomaly_scorer.threshold, float)
