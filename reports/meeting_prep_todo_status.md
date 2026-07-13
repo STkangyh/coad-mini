@@ -126,7 +126,9 @@ TODO #3의 "개선에 스트레스 받기보다 사용하면서 안되는 것을
 ## 커밋 이력 (`feature/ssm-temporal` 브랜치)
 
 ```text
-fec671a study: val precision/recall/F1/mAP (full 48-way vs task-aware) + CIL setup docs
-5a9c9ec study: GDumb ablation refutes 'CL gain = buffer effect' + post-A-GEM method survey
+adfec1b study: quantify data-scarcity contribution to low full-48-way accuracy
+810ac39 docs: add TODO progress status report for meeting prep checklist
 6249a81 fix: OOD/anomaly badge never fired without ANOMALY_THRESHOLD env var
+5a9c9ec study: GDumb ablation refutes 'CL gain = buffer effect' + post-A-GEM method survey
+fec671a study: val precision/recall/F1/mAP (full 48-way vs task-aware) + CIL setup docs
 ```
