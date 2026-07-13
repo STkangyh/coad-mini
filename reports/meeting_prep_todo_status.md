@@ -1,0 +1,108 @@
+# 교수님 미팅 준비 — TODO 진행 상황
+
+Generated: 2026-07 (auto). 교수님이 주신 체크리스트 3개 + 파생 작업 1개의 완료 현황 정리.
+관련 코드/리포트는 각 항목에 링크.
+
+## 요약
+
+| # | TODO | 상태 |
+|---|---|---|
+| 1 | val으로 정확도 지표 산출 (precision, recall, accuracy, mAP, …) | ✅ 완료 |
+| 2 | 현재 CIL 학습 세팅 확인 (initial vs continual 클래스 수) | ✅ 완료 |
+| 3 | A-GEM 이후 학습 방법 조사/비교 (개선 스트레스보다 실사용 문제 해결) | ✅ 완료 |
+| 4 | (파생) 데모 앱 실사용 점검 → 발견된 버그 수정 | ✅ 완료 |
+
+전체 테스트 59 passed, 브랜치 `feature/ssm-temporal`.
+
+---
+
+## [x] 1. val 정확도 지표 산출 (precision, recall, accuracy, mAP)
+
+**스크립트:** [`dev/compute_val_metrics.py`](../dev/compute_val_metrics.py)
+**리포트:** [`reports/val_metrics_result.md`](val_metrics_result.md)
+
+배포된 실제 체크포인트(`baseline_48cls.pt`, `agem_48cls.pt`)로 val set 4702개 전량 평가.
+**두 평가 체제를 동시에 산출**한 게 핵심 — 이유는 TODO #2와 직결됨(아래 참고):
+
+| Regime | Metric | Baseline | A-GEM | Δ |
+|---|---|---|---|---|
+| **Full 48-way** (진짜 class-IL, task ID 없음, chance=2.1%) | Accuracy | 0.062 | 0.099 | +0.037 |
+| Full 48-way | mAP | 0.043 | 0.104 | **+0.060** |
+| Full 48-way | F1 (macro) | **0.015** | 0.068 | +0.053 |
+| Task-aware 6-way (chance=16.7%, 기존 headline `avg_acc`) | Accuracy | 0.230 | 0.363 | +0.133 |
+| Task-aware 6-way | F1 (macro) | 0.163 | 0.353 | +0.190 |
+
+**발견한 것:**
+- Task ID 없이(진짜 class-IL) 평가하면 정확도가 훨씬 낮음 — task-aware 수치만 보고하면 과대평가.
+- **baseline의 F1(macro)가 0.015로 붕괴** — catastrophic forgetting의 전형적 지문(순차학습이 최근 클래스로 예측을 몰아주면서 클래스별 재현율이 거의 0). A-GEM은 0.068로 완화(그래도 어려운 지표이므로 절대치는 낮음, 정직하게 인정).
+- A-GEM의 baseline 대비 우위는 **두 체제 모두에서 유지**.
+
+---
+
+## [x] 2. 현재 CIL 학습 세팅 (initial vs continual 클래스 수)
+
+**확인 방법:** 코드 직접 추적 (`experiments/run_capacity_ablation.py::run_one`, `src/utils/gem.py::precompute_ref/apply`)
+
+| 구간 | 클래스 수 | 비율 | 메커니즘 |
+|---|---|---|---|
+| **Stage 1 = initial training** | 6 클래스 | 12.5% | `gem._memory`가 비어있어 `precompute_ref`가 `g_ref=None` 반환 → `apply()`가 no-op → **순수 cross-entropy, replay 없음** |
+| **Stage 2~8 = continual training** | 42 클래스 (7 stage × 6) | 87.5% | 매 스테이지 종료 시 `gem.add_stage()`가 balanced 50개를 replay 메모리에 추가 → 이후 스테이지는 growing 메모리로 A-GEM 보호받으며 학습 |
+
+**결론:** 초기 6클래스 : 지속 42클래스 = **1 : 7 스테이지 비율**. 이 구조가 확정되면서 TODO #1의 "왜 두 체제로 평가했나"도 함께 설명됨 — 우리 `eval_stage`가 스테이지별 6-way로 argmax를 제한하는 **task-aware(task-incremental) 평가**라, chance는 1/48이 아니라 **1/6**이고 class-IL SOTA와 직접 비교 불가능함을 명시.
+
+---
+
+## [x] 3. A-GEM 이후 학습 방법 조사/비교
+
+**스크립트:** [`dev/run_er_comparison.py`](../dev/run_er_comparison.py), [`dev/run_gdumb_comparison.py`](../dev/run_gdumb_comparison.py)
+**리포트:** [`reports/post_agem_methods_comparison.md`](post_agem_methods_comparison.md)
+
+### 실측 비교 (동일 스택, mem 예산 동일)
+
+| 방법 | 메커니즘 | Avg Acc | S1 forgetting |
+|---|---|---|---|
+| **GDumb** (ECCV'20) | greedy balanced 버퍼 + 매 스테이지 재학습, CL 알고리즘 없음 | 0.164 ± 0.004 | +0.059 ± 0.042 |
+| baseline | 메모리 없음 | 0.251 ± 0.021 | +0.115 ± 0.088 |
+| plain ER | 리허설, gradient projection 없음 | 0.346 ± 0.012 | +0.020 ± 0.098 |
+| **A-GEM** | ER + gradient projection | **0.387 ± 0.018** | **−0.061 ± 0.077** |
+
+**핵심 발견 — "CL 이득이 버퍼 효과일 뿐 아니냐"는 표준 반론을 직접 검증·반증:**
+GDumb(0.164)이 chance(0.167) 수준이고 **baseline보다도 낮음** → 버퍼 존재 자체가 이득을 만드는 게 아니라, **gradient projection(A-GEM) 알고리즘이 실제 가치를 더한다**(GDumb 대비 +0.223).
+
+### 문헌 비교 (A-GEM 이후 흐름)
+ER-ACE·DER/DER++·X-DER(리허설 강화), L2P·DualPrompt·RanPAC(frozen backbone + prompt/prototype), PIVOT·SMILE·ESSENTIAL(비디오 CIL SOTA, 우리와 같은 frozen-CLIP 재료 사용) 등을 표로 정리 — 상세는 리포트 참고.
+
+**가이드 반영:** capacity·backbone·attention·SSM·data-scale·ER·GDumb까지 폭넓게 통제 실험을 마쳤고, 여기서 더 새 알고리즘을 얹는 것은 한계효용이 낮다고 판단 → **정확도 개선 탐색을 멈추고 실사용 품질(TODO #4)로 방향 전환**.
+
+---
+
+## [x] 4. (파생) 데모 앱 실사용 점검 → 버그 수정
+
+TODO #3의 "개선에 스트레스 받기보다 사용하면서 안되는 것을 고치자"는 지침을 실제로 실행한 항목.
+
+**발견:** 데모를 직접 구동해보다가 **OOD 이상탐지 배지가 기본 설정(`uvicorn app:app` 그대로, Docker/HF Spaces 배포 경로 포함)에서는 한 번도 작동한 적이 없었음**을 발견. 원인: `threshold=None`이 기본값이라 `is_anomaly`가 항상 `False`로 고정 — 크래시가 없어 눈에 안 띄던 조용한 버그.
+
+**수정:** `app.py` 시작 시 자동 보정 로직 추가.
+- 로컬(실제 val feature 있음): 실제 in-distribution 분포로 보정.
+- Docker/HF Spaces(데이터 미포함): `experiments/calibrate_anomaly.py`와 동일한 synthetic in-distribution 샘플로 폴백.
+
+**검증:** held-out 데이터로 보정 유효성 확인 — 목표 FPR 5% vs 실측 4%, feature-space OOD 입력은 42% 플래그(정상 데이터 4%와 뚜렷이 구분). 재발 방지 회귀 테스트 추가(`tests/test_app_endpoints.py::test_anomaly_threshold_auto_calibrated`).
+
+---
+
+## 종합 산출물
+
+| 파일 | 내용 |
+|---|---|
+| [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 4개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
+| [`reports/val_metrics_result.md`](val_metrics_result.md) | TODO #1 상세 |
+| [`reports/post_agem_methods_comparison.md`](post_agem_methods_comparison.md) | TODO #3 상세 |
+| [`reports/measured_evidence.md`](measured_evidence.md) | 이전 라운드 실측 증거(ER/std/capacity/효율) |
+
+## 커밋 이력 (`feature/ssm-temporal` 브랜치)
+
+```text
+fec671a study: val precision/recall/F1/mAP (full 48-way vs task-aware) + CIL setup docs
+5a9c9ec study: GDumb ablation refutes 'CL gain = buffer effect' + post-A-GEM method survey
+6249a81 fix: OOD/anomaly badge never fired without ANOMALY_THRESHOLD env var
+```
