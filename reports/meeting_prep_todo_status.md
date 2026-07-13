@@ -11,6 +11,7 @@ Generated: 2026-07 (auto). 교수님이 주신 체크리스트 3개 + 파생 작
 | 2 | 현재 CIL 학습 세팅 확인 (initial vs continual 클래스 수) | ✅ 완료 |
 | 3 | A-GEM 이후 학습 방법 조사/비교 (개선 스트레스보다 실사용 문제 해결) | ✅ 완료 |
 | 4 | (파생) 데모 앱 실사용 점검 → 발견된 버그 수정 | ✅ 완료 |
+| 5 | (파생) full-48-way 데이터 스케일링 정량화 ("정확도 낮은 게 데이터 부족 때문?") | ✅ 완료 |
 
 전체 테스트 59 passed, 브랜치 `feature/ssm-temporal`.
 
@@ -90,12 +91,35 @@ TODO #3의 "개선에 스트레스 받기보다 사용하면서 안되는 것을
 
 ---
 
+## [x] 5. (파생) full-48-way 데이터 스케일링 정량화
+
+**질문:** "full-48-way 정확도가 6~10%로 낮은 게 학습 데이터가 적어서인가?"
+
+**스크립트:** [`dev/run_data_scale_full48way.py`](../dev/run_data_scale_full48way.py)
+**리포트:** [`reports/data_scale_full48way_result.md`](data_scale_full48way_result.md)
+
+기존 데이터 스케일링 연구(task-aware만 측정)를 **full-48-way 지표까지 확장**해 같은 (seed, fraction) 프로토콜로 재측정.
+
+| 데이터 | Task-aware Acc | Full-48-way Acc | Full F1(macro) |
+|---|---|---|---|
+| 25% | 0.314 | 0.070 | 0.036 |
+| 100% | 0.388 | **0.105** | **0.075** |
+| 25%→100% 상대증가 | +23.6% | **+49.9%** | **+109.2%** |
+
+**결론 (세 원인의 복합작용으로 확정):**
+1. **데이터 부족은 실제로 유의미하게 기여함** — full-48-way도 상대적으로 task-aware보다 더 크게 개선(F1은 2배 이상).
+2. **하지만 그것만으론 설명 안 됨** — 100% 데이터를 다 써도 accuracy 10.5%(chance의 5배)에 그치고, 50→100% 구간에서 성장이 이미 2~3배 둔화(saturation 근접).
+3. → **데이터 부족 + 망각(TODO #1의 F1 0.015 붕괴) + CLIP의 구조적 모션 표현력 한계**, 세 가지가 함께 작용.
+
+---
+
 ## 종합 산출물
 
 | 파일 | 내용 |
 |---|---|
-| [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 4개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
+| [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 5개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
 | [`reports/val_metrics_result.md`](val_metrics_result.md) | TODO #1 상세 |
+| [`reports/data_scale_full48way_result.md`](data_scale_full48way_result.md) | TODO #5 상세 |
 | [`reports/post_agem_methods_comparison.md`](post_agem_methods_comparison.md) | TODO #3 상세 |
 | [`reports/measured_evidence.md`](measured_evidence.md) | 이전 라운드 실측 증거(ER/std/capacity/효율) |
 

@@ -142,8 +142,9 @@
 **Q5. 이게 논문이 되나?**
 정확도 SOTA 논문은 아님. 대신 **(a) 통제된 실증 연구**("아키텍처가 아니라 데이터가 레버" — Attention −0.103·SSM −0.040·데이터 +0.06~0.07의 bottleneck 분석) + **(b) 가벼운 배포형 시스템**(CPU 실시간 캡션, few-shot 라이브 등록)의 결합. 워크샵/시스템 트랙 또는 "언제 단순함이 이기는가"류 실증 연구로 포지셔닝. ER/GDumb 비교군과 효율 벤치(학습시간·peak 메모리·버퍼 크기를 정확도와 함께)를 채우면 설득력 상승.
 
-**Q6. frozen CLIP feature는 SSv2 모션을 못 잡지 않나?**
+**Q6. frozen CLIP feature는 SSv2 모션을 못 잡지 않나? (그리고 full-48-way가 낮은 게 데이터 부족 때문 아닌가?)**
 맞음 — SSv2는 모션 중심이라 appearance-only엔 가장 불리, 그래서 절대 정확도가 낮음. 하지만 **최강 vCLIMB 방법들도 똑같이 frozen CLIP을 쓰고**(PIVOT/ESSENTIAL) temporal 모듈로 보완. 우리는 그 temporal 부분을 가벼운 GRU로 대체 — 정확도 일부를 내주고 효율·적응성을 취한 명시적 트레이드오프.
+**데이터 부족 기여도도 직접 측정함**(`reports/data_scale_full48way_result.md`): full-48-way를 25→100% 데이터로 스케일링하면 accuracy **+49.9%, F1(macro)는 +109%**(2배 이상) 상대 개선 — 데이터가 유의미하게 기여하는 건 실측으로 확인. 하지만 **100% 데이터를 다 써도 accuracy는 10.5%**(chance의 5배)에 그치고, 50→100% 구간에서 성장이 이미 2~3배 둔화됨. → **데이터 부족·망각(baseline F1 0.015 붕괴)·CLIP 구조적 한계, 세 가지가 함께 작용하는 복합 원인**이며 데이터만으로는 설명 안 됨.
 
 **Q7. 48-class subset은 어떻게 골랐나? cherry-pick 아닌가?**
 빈도/방법-유리가 아니라 **8 stage × 6 class 의미론적 큐레이션**(Open/Close→…→Pretend/Show, 난이도 상승 커리큘럼). 클래스당 인스턴스는 seed 고정 random.sample 100개. 특정 방법에 유리하게 고른 게 아님.
