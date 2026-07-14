@@ -154,6 +154,8 @@ GRU가 쓸 시간 정보가 없다"는 기존 결론의 독립 재확인. few-sh
 ## 커밋 이력 (`feature/ssm-temporal` 브랜치)
 
 ```text
+77608f2 study: backprop-free CPU methods (NCM/SLDA/RLS) match or beat GRU+A-GEM
+f38b4dc docs: refresh commit-history block in TODO status report
 adfec1b study: quantify data-scarcity contribution to low full-48-way accuracy
 810ac39 docs: add TODO progress status report for meeting prep checklist
 6249a81 fix: OOD/anomaly badge never fired without ANOMALY_THRESHOLD env var
