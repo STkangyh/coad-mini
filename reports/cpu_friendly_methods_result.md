@@ -1,9 +1,9 @@
 # CPU-only 학습 방법 조사 — backprop-free 스트리밍/닫힌해 계열 실측
 
-Generated: 2026-07 (auto). 질문: "CPU로만 학습하는 다른 방법이 더 있나?"
-→ 문헌 조사 후, frozen-feature CL의 표준 계열(**backprop조차 없는** 스트리밍 통계/닫힌해 방법)을
-우리 스택에서 직접 실측. **결과: Deep SLDA가 A-GEM GRU와 task-aware 동률, 진짜 class-IL에선 +34% 우위,
-학습 130배 빠름, replay 버퍼 불필요.**
+Generated: 2026-07 (auto, 2차 확장). 질문: "CPU로만 학습하는 다른 방법이 더 있나?" + "더 최신 방법은?"
+→ 1차: 고전 계열(NCM/SLDA/RLS) 실측 — Deep SLDA가 A-GEM GRU와 task-aware 동률, class-IL +34% 우위.
+→ **2차(§6): 최신(2023–26) 계열 실측 — FeCAM(shared)이 전 지표 신기록: task-aware 0.410,
+full-48-way 0.157, 학습 8.7초.** GRU+A-GEM(0.387/0.105/270초)을 모든 축에서 능가.
 
 ## 1. 조사한 방법 계열 (문헌)
 
@@ -78,8 +78,54 @@ train 4800 / val 4702 전량.
 - 논문 서사 강화: "frozen feature 위에서는 (a) 아키텍처 복잡도도 (b) gradient 학습 자체도
   필수가 아니다 — 병목은 표현(CLIP)과 데이터"로 결론이 한 단계 더 일반화됨.
 
+## 6. 2차 확장 — 최신(2023~2026) 방법 조사 + 실측
+
+### 6-1. 문헌 지형 (2024~2026)
+
+| 방법 | venue | 핵심 아이디어 | 우리 스택 실측 |
+|---|---|---|---|
+| **FeCAM** | NeurIPS 2023 | Mahalanobis 분류 + 공분산 정규화 트릭(Tukey 변환·shrinkage·correlation 정규화) | ✅ 아래 |
+| **RanDumb** | NeurIPS 2024 | "랜덤 표현(RBF 커널 근사 RFF)이 온라인 CL로 *학습한* 표현을 이긴다" — 고정 랜덤 임베딩 + 스트리밍 선형 분류기 | ✅ 아래 |
+| **AnaCP** | NeurIPS 2025 | 분석적 대조 투영 — gradient 없이 feature 적응까지 수행, **joint-training 상한 도달** 주장 | 문헌만 (반복 투영 재현 무거움) |
+| **StPR** | **ICLR 2026** | **exemplar-free 비디오 CIL** — frame-shared semantics 증류 + 시간분해 MoE 라우팅 (UCF101/HMDB51/K400 SOTA) | 문헌만 (backbone 학습 필요) |
+| **CSTA** | 2025 | 인과적 시공간 적응 exemplar-free VCIL | 문헌만 |
+| EFCIL for SSMs | 2025 | SSM 백본용 exemplar-free CL | 문헌만 (우리 SSM 실험과 연결) |
+
+주목: 최신 흐름 자체가 우리 결론과 같은 방향 — **exemplar-free(버퍼 제거) + frozen/분석적 head**가
+2024~26 프론티어이고, 비디오 CIL 최신(StPR)도 리허설을 버렸다.
+
+### 6-2. 실측 (동일 8-stage 프로토콜) — `dev/run_modern_cpu_methods.py`
+
+| 방법 | task-aware | S1 drop | full-48 acc | full F1 | full mAP | 학습(초) |
+|---|---|---|---|---|---|---|
+| **FeCAM shared-cov (NeurIPS'23)** | **0.410** | +0.000 | **0.157** | **0.144** | **0.120** | 8.7 |
+| RanDumb-style RFF(2000)+SLDA (NeurIPS'24, 3 seeds) | 0.395±0.003 | −0.006 | 0.145 | 0.130 | 0.119 | 0.9 |
+| Deep SLDA (1차 실측) | 0.390 | +0.005 | 0.141 | 0.123 | 0.102 | 2.1 |
+| (참고) GRU + A-GEM | 0.387±0.018 | −0.061 | 0.105 | 0.075 | 0.105 | ~270 |
+| FeCAM per-class cov | 0.320 | +0.000 | 0.094 | 0.092 | 0.084 | 8.8 |
+
+### 6-3. 해석
+
+1. **최신 기법의 정규화 트릭이 실제로 더 얹힌다.** FeCAM(shared)의 Tukey 변환 + 공분산
+   정규화가 SLDA 대비 task-aware +2.0%p, full acc +1.6%p → **전 지표 신기록**. 이제
+   backprop-free 계열이 GRU+A-GEM을 task-aware에서도 명확히 이김(0.410 vs 0.387).
+2. **RanDumb 논문 주장이 우리 세팅에서도 재현됨** — 고정 RBF 랜덤 임베딩+선형 head(0.9초
+   학습)가 backprop로 학습한 GRU를 이긴다. "온라인 CL에서 표현 *학습* 자체가 이득이 없다"는
+   RanDumb의 도발적 결론과 우리 데이터가 일치. (단 1차의 ReLU 랜덤투영은 실패했는데 RBF-RFF는
+   성공 — 커널 근사의 기하가 중요, 단순 차원 확장이 아님.)
+3. **FeCAM per-class는 실패 — 이유가 유익함.** 클래스당 100개로 512-d 공분산을 클래스별
+   추정하면 과적합(0.320). 우리 데이터 규모에선 **공유 공분산이 정답** — "작은 데이터에선
+   단순한 쪽이 이긴다"는 프로젝트 전체 패턴의 또 하나의 사례.
+4. 미실측 최신(AnaCP·StPR)은 방향 제시용: AnaCP는 "gradient 없이 joint-training 상한"까지
+   주장하므로 후속 검증 가치가 있고, StPR은 Ego4D 확장 시 비디오 CIL 최신 비교군.
+
 ## 참고 문헌
 
+- FeCAM: Goswami et al., NeurIPS 2023 — https://arxiv.org/abs/2309.14062
+- RanDumb: Prabhu et al., NeurIPS 2024 — https://arxiv.org/abs/2402.08823
+- AnaCP: NeurIPS 2025 — https://arxiv.org/abs/2511.13880
+- StPR (exemplar-free video CIL): ICLR 2026 — https://arxiv.org/abs/2505.13997
+- CSTA (exemplar-free video CIL): 2025 — https://arxiv.org/abs/2501.07236
 - Deep SLDA: Hayes & Kanan, CVPR-W 2020 — https://arxiv.org/abs/1909.01520
 - SimpleCIL/APER: Zhou et al., IJCV 2024 — https://arxiv.org/abs/2303.07338
 - RanPAC: McDonnell et al., NeurIPS 2023 — https://arxiv.org/abs/2307.02251
@@ -90,5 +136,6 @@ train 4800 / val 4702 전량.
 ## 재현
 
 ```bash
-python3 dev/run_cpu_friendly_methods.py   # 전체 ~10초 (feature 로딩 포함)
+python3 dev/run_cpu_friendly_methods.py   # 1차: NCM/SLDA/RLS (~10초)
+python3 dev/run_modern_cpu_methods.py     # 2차: FeCAM/RanDumb (~1분)
 ```

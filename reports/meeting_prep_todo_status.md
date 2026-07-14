@@ -127,16 +127,20 @@ Deep SLDA, Ridge RLS/ACIL, RanPAC-lite)을 문헌 조사 후 동일 8-stage 프�
 | 방법 (replay 버퍼 불필요) | task-aware | full-48 acc | full F1 | 학습(초) |
 |---|---|---|---|---|
 | NCM 프로토타입 (학습 0초) | 0.378 | 0.124 | 0.105 | 0.0 |
-| **Deep SLDA** | **0.390** | **0.141** | **0.123** | **2.1** |
+| Deep SLDA ('20) | 0.390 | 0.141 | 0.123 | 2.1 |
 | Ridge RLS (닫힌해) | 0.373 | 0.143 | 0.122 | 0.0 |
+| RanDumb-style RFF+SLDA (NeurIPS'24) | 0.395±0.003 | 0.145 | 0.130 | 0.9 |
+| **FeCAM shared-cov (NeurIPS'23)** | **0.410** | **0.157** | **0.144** | 8.7 |
 | (참고) GRU + A-GEM | 0.387 | 0.105 | 0.075 | ~270 |
 
-**핵심 발견:** Deep SLDA가 **task-aware에서 A-GEM과 동률(0.390 vs 0.387), 진짜 class-IL에선
-+34% 우위(0.141 vs 0.105), 학습 130배 빠름(2초 vs 4.5분), replay 버퍼 불필요.** 통계 계열은
-클래스별 통계가 독립 누적이라 **망각이 구조적으로 없음** — backprop 계열의 진짜 적이
-망각(로짓 쏠림)이었음을 역으로 증명. mean-pool(시간 폐기)로도 이긴다는 건 "CLIP feature에
-GRU가 쓸 시간 정보가 없다"는 기존 결론의 독립 재확인. few-shot enrollment를 프로토타입
-방식으로 바꾸면 등록이 밀리초 단위가 되는 실용 시사점도 있음.
+**핵심 발견 (2차 확장 — 최신 방법 포함):** backprop-free 통계 계열이 GRU+A-GEM과 동률을 넘어
+**최신 FeCAM(shared)은 전 지표에서 명확히 우위**(task 0.410 vs 0.387, full-48 0.157 vs 0.105,
+학습 30배 빠름). 통계 계열은 클래스별 통계가 독립 누적이라 **망각이 구조적으로 없음** —
+backprop 계열의 진짜 적이 망각(로짓 쏠림)이었음을 역으로 증명. RanDumb(NeurIPS'24)의 "랜덤
+표현이 학습된 표현을 이긴다"도 재현. 최신 문헌 지형(AnaCP NeurIPS'25 = gradient 없이
+joint-training 상한 주장, StPR ICLR'26 = exemplar-free 비디오 CIL SOTA)도 정리 — 프론티어
+자체가 exemplar-free·분석적 head 방향으로 이동 중이라 우리 결론과 합류. few-shot enrollment를
+프로토타입 방식으로 바꾸면 등록이 밀리초 단위가 되는 실용 시사점도 있음.
 
 ---
 
