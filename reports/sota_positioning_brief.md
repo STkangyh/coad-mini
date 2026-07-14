@@ -163,6 +163,16 @@
 synthetic in-distribution 샘플로 폴백)하도록 고쳤고, held-out 데이터로 보정 유효성(목표 FPR 5% vs 실측
 4%)까지 확인했습니다. "더 정확하게" 보다 "실제로 동작하게"를 우선한 사례.
 
+**Q10. backprop 없는 방법(SLDA/프로토타입)도 있는데, 그럼 GRU+A-GEM이 필요하긴 한가?**
+날카로운 질문이고, **직접 실측해서 정직하게 답함**(`reports/cpu_friendly_methods_result.md`):
+frozen feature 위에서 Deep SLDA(클래스 평균+공유 공분산, backprop·replay 버퍼 모두 불필요)가
+**task-aware 동률(0.390 vs 0.387), 진짜 class-IL에선 +34% 우위(0.141 vs 0.105), 학습 2초(130배 빠름)**.
+이는 우리 핵심 결론("frozen feature 위에선 복잡도가 병목이 아니다")을 **한 단계 더 일반화**하는
+발견 — 아키텍처뿐 아니라 **gradient 학습 자체도 필수가 아님**. GRU+A-GEM에 남는 고유 강점은
+task-aware backward-transfer(S1 −0.061)와 시퀀스 입력 유지 정도이며, 시스템(데모)의 다음
+업그레이드로 SLDA/프로토타입 head 채택을 검토 중(few-shot 등록이 밀리초로 단축). 새 방법을
+숨기지 않고 우리 스택에서 검증해 방향 전환 근거로 삼는 것 자체가 이 프로젝트의 방법론.
+
 ---
 
 ## 빈칸 체크리스트 — 대부분 실측 완료 (`reports/measured_evidence.md`)

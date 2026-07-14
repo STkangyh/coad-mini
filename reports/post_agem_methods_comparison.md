@@ -41,6 +41,15 @@ Generated: 2026-07 (auto). 목적: "A-GEM 다음으로 뭘 써야 하나"에 답
 | RanPAC / SimpleCIL | NeurIPS'23 / IJCV'24 | frozen backbone + prototype(학습 거의 없음) | prompt-pool도 이김 (강한 frozen feature가 핵심) | 매우 저비용 — **우리 frozen-CLIP 선택과 같은 철학** |
 | **PIVOT / SMILE / ESSENTIAL** | CVPR'23 / ICCV'25 | **비디오 CIL 전용**: frozen CLIP + temporal prompt / sparse memory | vCLIMB SOTA (UCF101 93~96%) | 우리와 같은 frozen-CLIP 재료, 그 위에 무거운 temporal 모듈 |
 
+## 2.5 후속 실측 — backprop-free 계열 (NCM/SLDA/RLS)
+
+위 문헌표의 "frozen backbone + prototype" 철학을 끝까지 밀면 **gradient 학습 자체가 없는**
+계열(NCM, Deep SLDA, Ridge RLS/ACIL)이 나온다. 이후 별도 실측한 결과
+(→ [`cpu_friendly_methods_result.md`](cpu_friendly_methods_result.md)):
+**Deep SLDA가 task-aware에서 A-GEM과 동률(0.390 vs 0.387), full-48-way에선 +34% 우위(0.141 vs
+0.105), 학습 2초, replay 버퍼 불필요.** 통계 계열은 망각이 구조적으로 없어 backprop 계열의
+근본 약점(로짓 쏠림)을 우회한다 — 아래 결론("복잡도 추가는 무익")을 한층 더 강화하는 증거.
+
 ## 3. 결론 — 왜 여기서 더 안 파고, 사용성으로 전환하나
 
 지금까지 커버한 축을 다 합치면:

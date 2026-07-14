@@ -12,6 +12,7 @@ Generated: 2026-07 (auto). 교수님이 주신 체크리스트 3개 + 파생 작
 | 3 | A-GEM 이후 학습 방법 조사/비교 (개선 스트레스보다 실사용 문제 해결) | ✅ 완료 |
 | 4 | (파생) 데모 앱 실사용 점검 → 발견된 버그 수정 | ✅ 완료 |
 | 5 | (파생) full-48-way 데이터 스케일링 정량화 ("정확도 낮은 게 데이터 부족 때문?") | ✅ 완료 |
+| 6 | (파생) CPU-only 학습 방법 추가 조사 — backprop-free 스트리밍/닫힌해 계열 실측 | ✅ 완료 |
 
 전체 테스트 59 passed, 브랜치 `feature/ssm-temporal`.
 
@@ -113,6 +114,32 @@ TODO #3의 "개선에 스트레스 받기보다 사용하면서 안되는 것을
 
 ---
 
+## [x] 6. (파생) CPU-only 학습 방법 추가 조사 — backprop-free 계열 실측
+
+**질문:** "CPU로만 학습을 시도하는 다른 학습 방법이 더 있나?"
+
+**스크립트:** [`dev/run_cpu_friendly_methods.py`](../dev/run_cpu_friendly_methods.py)
+**리포트:** [`reports/cpu_friendly_methods_result.md`](cpu_friendly_methods_result.md)
+
+frozen-feature CL의 표준 계열(**backprop조차 없는** 스트리밍 통계/닫힌해: NCM 프로토타입,
+Deep SLDA, Ridge RLS/ACIL, RanPAC-lite)을 문헌 조사 후 동일 8-stage 프로토콜로 실측.
+
+| 방법 (replay 버퍼 불필요) | task-aware | full-48 acc | full F1 | 학습(초) |
+|---|---|---|---|---|
+| NCM 프로토타입 (학습 0초) | 0.378 | 0.124 | 0.105 | 0.0 |
+| **Deep SLDA** | **0.390** | **0.141** | **0.123** | **2.1** |
+| Ridge RLS (닫힌해) | 0.373 | 0.143 | 0.122 | 0.0 |
+| (참고) GRU + A-GEM | 0.387 | 0.105 | 0.075 | ~270 |
+
+**핵심 발견:** Deep SLDA가 **task-aware에서 A-GEM과 동률(0.390 vs 0.387), 진짜 class-IL에선
++34% 우위(0.141 vs 0.105), 학습 130배 빠름(2초 vs 4.5분), replay 버퍼 불필요.** 통계 계열은
+클래스별 통계가 독립 누적이라 **망각이 구조적으로 없음** — backprop 계열의 진짜 적이
+망각(로짓 쏠림)이었음을 역으로 증명. mean-pool(시간 폐기)로도 이긴다는 건 "CLIP feature에
+GRU가 쓸 시간 정보가 없다"는 기존 결론의 독립 재확인. few-shot enrollment를 프로토타입
+방식으로 바꾸면 등록이 밀리초 단위가 되는 실용 시사점도 있음.
+
+---
+
 ## 종합 산출물
 
 | 파일 | 내용 |
@@ -120,6 +147,7 @@ TODO #3의 "개선에 스트레스 받기보다 사용하면서 안되는 것을
 | [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 5개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
 | [`reports/val_metrics_result.md`](val_metrics_result.md) | TODO #1 상세 |
 | [`reports/data_scale_full48way_result.md`](data_scale_full48way_result.md) | TODO #5 상세 |
+| [`reports/cpu_friendly_methods_result.md`](cpu_friendly_methods_result.md) | TODO #6 상세 |
 | [`reports/post_agem_methods_comparison.md`](post_agem_methods_comparison.md) | TODO #3 상세 |
 | [`reports/measured_evidence.md`](measured_evidence.md) | 이전 라운드 실측 증거(ER/std/capacity/효율) |
 
