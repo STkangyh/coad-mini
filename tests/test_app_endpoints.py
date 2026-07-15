@@ -36,6 +36,22 @@ def test_reset_classes_returns_to_base():
     assert client.get("/classes").json()["enrolled"] == []
 
 
+def test_fecam_head_loaded_and_serving():
+    """FeCAM head (backprop-free classifier) should load at startup and be
+    reflected in /health; fecam_predict must return the same result schema
+    as the GRU predict() helper so the UI can render it."""
+    r = client.get("/health").json()
+    assert r["fecam_ready"] is True
+    assert r["fecam_n_classes"] >= 48
+
+    import numpy as np, torch
+    feat = torch.tensor(np.random.randn(16, 512), dtype=torch.float32).unsqueeze(0)
+    out = app.fecam_predict(feat, top_k=3)
+    assert len(out) == 3
+    assert {"class_id", "label", "template", "examples", "prob"} <= set(out[0].keys())
+    assert 0.0 <= out[0]["prob"] <= 1.0
+
+
 def test_anomaly_threshold_auto_calibrated():
     """Regression test: without ANOMALY_THRESHOLD set, the OOD badge used to
     never fire because the scorer's threshold stayed None forever. Startup

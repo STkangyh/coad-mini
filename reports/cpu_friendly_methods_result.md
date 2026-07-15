@@ -119,6 +119,38 @@ train 4800 / val 4702 전량.
 4. 미실측 최신(AnaCP·StPR)은 방향 제시용: AnaCP는 "gradient 없이 joint-training 상한"까지
    주장하므로 후속 검증 가치가 있고, StPR은 Ego4D 확장 시 비디오 CIL 최신 비교군.
 
+## 7. 우리 방법(GRU+A-GEM) 대비 차이 요약 (Δ = 대안 − 우리)
+
+| 방법 | task-aware (Δ) | full-48 acc (Δ) | full F1 (Δ) | 학습 시간 | 버퍼 |
+|---|---|---|---|---|---|
+| **FeCAM shared** | 0.410 (**+0.023**) | 0.157 (**+0.052, +50%**) | 0.144 (**+0.069, +92%**) | 8.7초 (31배↓) | 불필요 |
+| RanDumb RFF | 0.395 (+0.008) | 0.145 (+0.040) | 0.130 (+0.055) | 0.9초 (300배↓) | 불필요 |
+| Deep SLDA | 0.390 (+0.003) | 0.141 (+0.036) | 0.123 (+0.048) | 2.1초 (130배↓) | 불필요 |
+| Ridge RLS | 0.373 (−0.014) | 0.143 (+0.038) | 0.122 (+0.047) | ~0초 | 불필요 |
+| NCM | 0.378 (−0.009) | 0.124 (+0.019) | 0.105 (+0.030) | 0초 | 불필요 |
+| FeCAM per-class | 0.320 (−0.067) | 0.094 (−0.011) | 0.092 (+0.017) | 8.8초 | 불필요 |
+| **우리 (GRU+A-GEM)** | **0.387 (기준)** | **0.105 (기준)** | **0.075 (기준)** | ~270초 | 필요(50/stage) |
+
+우리가 아직 이기는 축: **S1 backward-transfer**(−0.061, 리허설 고유 효과)와 시퀀스 입력 유지뿐.
+
+## 8. 데모 앱 통합 (실행 완료)
+
+조사에서 끝내지 않고 **FeCAM head를 데모에 실제 탑재**:
+
+- `src/models/fecam_head.py` — FeCAMHead(observe/enroll_class/scores/save/load), 테스트 8개.
+- `dev/build_fecam_head.py` — train feature로 head 생성(**fit 0.1초**), `checkpoints/fecam_head.npz`(2.1MB).
+  val 재현: task-aware 0.410 / full-48-way 0.157 (실험치와 일치).
+- `app.py` — 실시간 자막에 **FeCAM 세 번째 박스(파랑)** 추가(Baseline/A-GEM/FeCAM 삼자 비교),
+  `/predict`·`/predict_rt` 응답에 `fecam` 키, `/health`에 fecam 상태.
+- **밀리초 enrollment**: `/enroll`이 GRU 경로와 병행으로 FeCAM 프로토타입 등록 수행 —
+  **실측 0.17ms**(클립 5개). 평균 벡터 1개 계산이라 기존 클래스 통계를 전혀 건드리지 않음
+  = **망각이 구조적으로 불가능한 등록**. 응답에 `fecam_ms` 포함, UI에 표시.
+- 재시작 persist(`fecam_head_enrolled.npz`) + `/reset_classes` 연동. Dockerfile이 checkpoints/를
+  복사하므로 HF Spaces 재배포 시 자동 포함.
+
+데모 서사: 같은 화면에서 **"순차학습(빨강, 망각) vs 리허설(초록) vs 통계 계열(파랑, 무망각)"**
+삼자 비교 + 새 동작을 가르치면 파랑은 0.2ms 만에 배우는 대비를 라이브로 보여줄 수 있음.
+
 ## 참고 문헌
 
 - FeCAM: Goswami et al., NeurIPS 2023 — https://arxiv.org/abs/2309.14062
