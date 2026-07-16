@@ -43,6 +43,10 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
    Raspberry Pi 급에서 학습·추론 시간, (가능하면) 전력 측정이 논문 설득력을 크게 올림.
 2. **CLIP 인코더가 추론 병목** (156ms/window) — edge용 경량 비전 인코더(MobileCLIP,
    TinyCLIP 등)로 feature 교체 시 정확도-지연 트레이드오프 측정.
+   **착수함 → `reports/mobileclip_result.md`.** CPU 지연 측정은 완료(중요한 반전:
+   MobileCLIP-S0가 파라미터 8배 작은데도 일반 PyTorch CPU에선 CLIP B/32보다
+   13~18배 느림 — CoreML/ANE 전용 커널을 겨냥한 설계라 범용 CPU에선 이점이 안 살아남).
+   다운스트림 정확도 비교는 원본 SSv2 영상 접근이 막혀 **보류 중**(재개 커맨드 리포트에 있음).
 3. **진짜 스트리밍/online 프로토콜** — 통계 계열은 이미 single-pass. epoch 반복 없는
    one-pass 세팅으로 전 방법 통일 비교하면 edge 서사가 완성됨.
 4. **에너지/메모리 프로파일** — RAM peak은 있고(0.95GB), 전력은 미측정.

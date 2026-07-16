@@ -63,6 +63,15 @@ BACKBONES = {
         output_dir=DATA_DIR / "features_siglip_l16_384",
         note="SigLIP large patch16 384 candidate backbone.",
     ),
+    "mobileclip_s0": BackboneConfig(
+        key="mobileclip_s0",
+        model_name="apple/mobileclip_s0_timm",
+        output_dir=DATA_DIR / "features_mobileclip_s0",
+        note="Apple MobileCLIP-S0 (edge-oriented, 10.9M params vs CLIP B/32's "
+             "87.5M). CAUTION: designed for CoreML/ANE kernels -- generic "
+             "PyTorch CPU eager execution is much SLOWER than CLIP B/32 for "
+             "this architecture (measured ~13x, see reports/mobileclip_result.md).",
+    ),
 }
 
 
@@ -121,6 +130,11 @@ def extract(frames: list[Image.Image], model, processor, device: str) -> np.ndar
     elif hasattr(model, "get_image_features"):
         # Fallback: models that only expose get_image_features
         feats = model.get_image_features(pixel_values=pixel_values)
+    elif type(model).__name__ == "TimmWrapperModel":
+        # Edge-oriented timm-backed models (e.g. MobileCLIP-S0 image tower):
+        # no text tower / no CLIP projection head in this checkpoint, use the
+        # pooled backbone feature directly.
+        feats = model(pixel_values=pixel_values).pooler_output
     else:
         raise RuntimeError(f"Cannot extract image features from {type(model).__name__}")
 
