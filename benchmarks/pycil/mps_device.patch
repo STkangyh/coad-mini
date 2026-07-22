@@ -1,0 +1,15 @@
+--- a/trainer.py
++++ b/trainer.py
+@@ -150,10 +150,12 @@ def _set_device(args):
+
+     for device in device_type:
+         if device == -1:
+             device = torch.device("cpu")
++        elif device == "mps":
++            device = torch.device("mps")
+         else:
+             device = torch.device("cuda:{}".format(device))
+
+         gpus.append(device)
+
+     args["device"] = gpus

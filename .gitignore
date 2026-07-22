@@ -33,3 +33,6 @@ dev/pipeline_driver.py
 
 # ── Misc local logs ───────────────────────────────────────────
 *.log
+
+# ── Third-party checkouts (PyCIL etc. — see benchmarks/pycil/README.md) ──
+external/
