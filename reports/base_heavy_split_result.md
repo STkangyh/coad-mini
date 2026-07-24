@@ -68,17 +68,40 @@ FeCAM의 마지막 세션 정확도는 **moderate·aggressive 모두 0.157로 �
 순서/크기 구조 자체가 최종 상태에 영향을 주지 않는다는 이론적 성질이 실측으로 확인됨.
 per-session 곡선도 완만한 하강(0.193→0.157 등)만 보이고 붕괴가 없음.
 
-## 해석 — TCD의 발견과 우리 발견이 왜 다른가 (가설, 검증 안 됨)
+## 해석 — TCD의 발견과 우리 발견이 왜 다른가 (원문 확인 완료)
 
-TCD의 NME는 **SSv2로 직접 학습한(end-to-end trained) CNN feature**에 대해 계산됐을
-가능성이 높다(2021년 당시 CLIP 기반 video CIL은 아직 프론티어 이전) — 그런 feature는
-모션 정보를 인코딩하고 있어서, 프레임을 단순 평균내면 그 정보가 파괴된다. 반면 우리는
-**frozen CLIP(appearance-only, SSv2로 학습되지 않음)** feature를 쓰므로애초에 평균낼
-"시간 정보"가 적어 mean-pool의 손실이 작다 — 이는 §1(f)/Q6에서 이미 짚은 "SSv2는 모션
-중심이라 CLIP에 불리하다"는 한계와 같은 뿌리다. **정리하면: TCD의 반례는 "강한
-temporal feature 위에서의 mean-pool"에 대한 경고이고, 우리는 애초에 temporal feature가
-약한 지점에서 시작하므로 그 경고가 우리에게 덜 해당한다**는 것이 가장 설득력 있는
-설명 — 단, TCD의 정확한 backbone을 확인하지 않았으므로 가설로 명시.
+TCD 원문(arXiv:2203.13611)을 직접 읽어 확정함. TCD의 백본은 **ResNet-50 + TSM
+(Temporal Shift Module)**, ImageNet 사전학습 가중치로 초기화한 뒤 **CIL 매 스테이지마다
+SSv2 영상으로 계속 fine-tune**됨(Kinetics 사전학습은 클래스 정보 누출 우려로 일부러
+배제). 즉 TCD의 NME가 계산되는 feature는 **SSv2 모션에 특화되도록 실제로 학습된
+feature**다 — 그런 feature를 프레임별로 단순 평균내면 학습된 시간 정보가 파괴된다.
+
+반면 우리는 **frozen CLIP(한 번도 SSv2로 학습되지 않은 appearance-only 표현)**을
+쓴다 — 애초에 평균낼 "학습된 시간 정보"가 없으므로 mean-pool의 손실이 작다. 이는
+§1(f)/Q6에서 짚은 "SSv2는 모션 중심이라 CLIP에 불리하다"는 한계와 같은 뿌리:
+**TCD의 반례는 "SSv2로 학습되어 모션을 담은 feature 위에서의 mean-pool"에 대한
+경고**이고, **우리는 애초에 그런 학습된 모션 정보가 없는 지점에서 시작**하므로 그
+경고가 구조적으로 덜 적용된다는 설명이 확정 근거로 뒷받침됨.
+
+### TCD 원문 정확한 수치 (Table 2, Something-Something V2)
+
+split: **84-class base + [10개×9 session] 또는 [5개×18 session]**(174클래스 전체),
+클래스 순서 3-seed(1000/1993/2021) 셔플 평균, exemplar 클래스당 20개.
+
+| Method | 10-group CNN | 10-group NME | 5-group CNN | 5-group NME |
+|---|---|---|---|---|
+| UCIR | 26.84 | 17.98 | 20.69 | 12.57 |
+| PODNet | 34.94 | 27.33 | 26.95 | 17.49 |
+| **TCD** | **35.78** | **28.88** | **29.60** | **21.63** |
+
+NME<CNN 격차: **−6.90%p**(10-group), **−7.97%p**(5-group). 논문 원문 인용:
+> "It is noticeable that, for Something-Something V2, the performance for NME
+> falls behind CNN. Since Something-Something V2 needs more temporal reasoning,
+> the strategies relying on naïve averaging of the features from all frames may
+> not be suitable."
+
+(참고: CSTA(41.26%)·STSP(69.68%) 등 후속 연구 수치는 TCD 원 논문 수치가 아니라
+**이후 개선된 후속 방법의 재구현/향상 결과** — TCD 자신의 보고치는 위 35.78%다.)
 
 ## 결론
 
