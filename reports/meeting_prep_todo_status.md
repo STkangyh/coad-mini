@@ -13,8 +13,9 @@ Generated: 2026-07 (auto). 교수님이 주신 체크리스트 3개 + 파생 작
 | 4 | (파생) 데모 앱 실사용 점검 → 발견된 버그 수정 | ✅ 완료 |
 | 5 | (파생) full-48-way 데이터 스케일링 정량화 ("정확도 낮은 게 데이터 부족 때문?") | ✅ 완료 |
 | 6 | (파생) CPU-only 학습 방법 추가 조사 — backprop-free 스트리밍/닫힌해 계열 실측 | ✅ 완료 |
+| 7 | (파생) SSv2를 CIL로 평가한 선행연구 조사 + TCD 반례 재검증 | ✅ 완료 |
 
-전체 테스트 59 passed, 브랜치 `feature/ssm-temporal`.
+전체 테스트 68 passed, 브랜치 `feature/pycil-benchmarks` (PR #2).
 
 ---
 
@@ -144,20 +145,61 @@ joint-training 상한 주장, StPR ICLR'26 = exemplar-free 비디오 CIL SOTA)�
 
 ---
 
+## [x] 7. (파생) SSv2를 CIL로 평가한 선행연구 조사 + TCD 반례 재검증
+
+**질문:** "SSv2를 CIL 관점에서 평가한 연구들이 있는가?"
+
+**리포트:** [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) §1(f) ·
+[`reports/base_heavy_split_result.md`](base_heavy_split_result.md)
+**스크립트:** [`dev/run_base_heavy_split.py`](../dev/run_base_heavy_split.py)
+
+문헌 조사 결과 **TCD(Park et al., ICCV 2021)**가 SSv2를 UCF101·HMDB51과 함께 CIL
+벤치마크로 처음 구성(84-class base + base-heavy incremental session), 이후 CSTA(2025)·
+STSP(ECCV'24)·ESSENTIAL(ICCV'25)이 같은 프로토콜을 계승 — **"SSv2로 CIL 하는 게
+새롭다"는 주장은 부정확**, TCD를 Related Work에 반드시 인용해야 함.
+
+**결정적 반례 발견 및 재검증:** TCD는 SSv2에서 **NME(prototype 계열, 우리 FeCAM과
+정신 유사)가 CNN보다 못하다**고 보고 — 우리 결론과 정면 충돌 가능성. 우리 48클래스를
+TCD 스타일 base-heavy 구조(24:6=4배, 36:6=6배)로 재편해 true class-IL로 직접 재검증:
+
+| split | FeCAM last | GRU+A-GEM last | Δ |
+|---|---|---|---|
+| 균등(원래) | 0.157 | 0.105 | +0.052 |
+| moderate(4배) | 0.157 | 0.109 | +0.048 |
+| aggressive(6배) | 0.157 | **0.084** | **+0.073** |
+
+**반전은 일어나지 않았고 오히려 격차가 확대됨.** 부수 발견: GRU+A-GEM이 base 세션
+직후 aggressive에서 −65% 급락 — A-GEM의 stage당 고정 replay 예산(50개)이 base
+클래스가 많을수록 클래스당 exemplar를 급감시키기 때문(8.33→1.39개/class). FeCAM
+강점과는 별개인 A-GEM 구현 자체의 개선 포인트로 확인. TCD와 결과가 다른 이유는
+backbone 차이(TCD=SSv2 직접학습 CNN, 우리=frozen CLIP) 가설이며, 완전 검증은 원본
+174-class split 재현 필요(영상 접근 복구 후 후속).
+
+---
+
 ## 종합 산출물
 
 | 파일 | 내용 |
 |---|---|
-| [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 5개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
+| [`reports/sota_positioning_brief.md`](sota_positioning_brief.md) | 위 7개 항목 전부 통합된 최종 미팅 브리핑 (Q&A 포함) |
 | [`reports/val_metrics_result.md`](val_metrics_result.md) | TODO #1 상세 |
 | [`reports/data_scale_full48way_result.md`](data_scale_full48way_result.md) | TODO #5 상세 |
 | [`reports/cpu_friendly_methods_result.md`](cpu_friendly_methods_result.md) | TODO #6 상세 |
 | [`reports/post_agem_methods_comparison.md`](post_agem_methods_comparison.md) | TODO #3 상세 |
+| [`reports/base_heavy_split_result.md`](base_heavy_split_result.md) | TODO #7 상세 (TCD 반례 재검증) |
+| [`reports/pycil_bridge_result.md`](pycil_bridge_result.md) | PyCIL 표준 벤치마크 교차검증 (CIFAR-100) |
 | [`reports/measured_evidence.md`](measured_evidence.md) | 이전 라운드 실측 증거(ER/std/capacity/효율) |
 
-## 커밋 이력 (`feature/ssm-temporal` 브랜치)
+## 커밋 이력 (`feature/pycil-benchmarks` 브랜치, PR #2)
 
 ```text
+(pending) study: TCD base-heavy split re-validation — FeCAM lead holds/widens
+ea6cb29 feat: PyCIL benchmark setup (CIFAR-100 + ImageNet) + analytic-head bridge
+e364e2c study: MobileCLIP-S0 edge-encoder benchmark — CPU latency inverts params
+f248d8b docs: pin official project focus — edge (CPU/embedded) continual learning for video
+56bd80a feat: integrate FeCAM head into the demo (3-way live captions, ms enrollment)
+cfc0b4c study: modern (2023-26) backprop-free CL — FeCAM sets new best on all metrics
+532d93c docs: refresh commit-history block (item 6 added)
 77608f2 study: backprop-free CPU methods (NCM/SLDA/RLS) match or beat GRU+A-GEM
 f38b4dc docs: refresh commit-history block in TODO status report
 adfec1b study: quantify data-scarcity contribution to low full-48-way accuracy

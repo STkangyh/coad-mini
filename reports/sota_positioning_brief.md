@@ -33,6 +33,30 @@
 **(e) SSM (우리가 실험한 확장 축)**
 - S4(ICLR'22), S5(ICLR'23), Mamba(2023), Vision Mamba(ICML'24), VideoMamba(ECCV'24). 전부 강점이 **길이(long-range)** 에서 나옴. "Repeat After Me"(ICML'24)는 고정 상태 SSM이 짧은 문맥 recall에서 이론적으로 불리함을 증명.
 
+**(f) TCD 계열 — SSv2 자체를 CIL 벤치마크로 쓴 연구 (우리 데이터셋 선택과 가장 직접 겹침)**
+- **"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열.** 원조는
+  **TCD**(Park et al., **ICCV 2021**, [arXiv:2203.13611](https://arxiv.org/abs/2203.13611) ·
+  [GitHub](https://github.com/bellos1203/TCD)) — UCF101·HMDB51·**SSv2** 세 데이터셋에
+  CIL split을 처음 구성. SSv2 174클래스 전체를 **84-class base session + 나머지를
+  10개씩 또는 5개씩** 묶은 incremental task로 나눔(= base-heavy/FSCIL에 가까운 구조).
+  Time-channel importance map + knowledge distillation로 망각 완화.
+- 후속: **CSTA**(2025, exemplar-free, [arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) —
+  같은 TCD 프로토콜(84 base + 90개를 9개씩 10 session), SSv2 정확도 **41.26%**(TimeFormer).
+  **STSP**(**ECCV 2024**, [PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) —
+  직교 subspace 분류기 + gradient를 과거 클래스 spatial feature의 null space로 투영(우리
+  A-GEM의 gradient projection과 결이 비슷, 적용 방식은 다름), SSv2 **69.68%**(이 계열 최고).
+  **ESSENTIAL**(ICCV'25, §1(c)와 동일 논문)도 같은 TCD 벤치마크에서 SSv2를
+  **"temporal-biased"** 난이도 스트레스 테스트로 명시적으로 사용.
+- **TCD의 결정적 발견 — 우리 결론과 정면으로 긴장:** NME(prototype/mean-embedding
+  분류기, 우리 FeCAM과 정신이 비슷)가 **SSv2에서 CNN보다 못함** — 프레임을 단순 평균내면
+  SSv2가 요구하는 시간적 추론 정보가 사라지기 때문. 우리는 정반대로 "mean-pool FeCAM이
+  GRU를 이긴다"를 결론으로 냈으므로, **이 긴장을 정직하게 다루고 직접 재검증**함
+  (`reports/base_heavy_split_result.md`).
+- **우리와의 구조적 차이 (숫자를 직접 비교하면 안 되는 이유):** TCD 계열은 174클래스
+  전체 + **base-heavy**(84:10=8.4배, 84:5=16.8배) 세션 구조. 우리는 48클래스 큐레이션
+  subset + **균등**(6:6=1배) 세션 구조. 클래스 범위·세션 skew가 다르므로 정확도를
+  직접 갖다 비교할 수 없고, "균등 분할·edge 예산" 조건으로 스코프를 명시적으로 좁혀야 함.
+
 ---
 
 ## 2. 우리 baseline
@@ -118,8 +142,9 @@
 
 - **정확도 최고점이 아님.** vCLIMB SOTA(PIVOT 93.4 / ESSENTIAL 95.8 / SMILE 95.7)와 표준 SSv2 recog(75~77%)에 크게 못 미침. 우리 ~0.40은 48cls/8stage subset 기준이라 직접 비교 불가.
 - **plain ER 비교 — 실행 완료(약점 해소).** 동일 스택·mem=50에서 **A-GEM 0.387 > ER 0.346 > baseline 0.251** (5 seeds). 우리 세팅에선 A-GEM이 ER보다 +4.1%p 우위라 이 노출점은 방어됨. (단 DER++/ER-ACE 등 *더 강한* 리허설·표준 class-IL 벤치까지는 미비교 — 후속 과제.)
-- **GDumb류 상한 미확인.** "CL 이득이 실은 버퍼 효과 아니냐"는 표준 반론. mem=50/stage 제약 하 GDumb(메모리-only)·무제약 버퍼 상한을 최소 1회 측정해 선점할 것(미팅 전 또는 즉시 후속으로 명시).
-- **작은 subset·단일 벤치.** 표준 vCLIMB 스플릿(UCF101/Kinetics)이 아니라 48-class 자체 subset이라 외부 방법과 head-to-head 불가.
+- **GDumb 비교 — 실행 완료(약점 해소).** GDumb(버퍼-only, 알고리즘 없음) **0.164±0.004 ≈ chance(0.167)**, baseline(0.251)보다도 낮음 → "CL 이득 = 버퍼 효과"라는 반론 반증. (`reports/post_agem_methods_comparison.md`)
+- **작은 subset·단일 벤치.** 표준 vCLIMB/TCD 스플릿(UCF101/Kinetics, 174-class SSv2)이 아니라 48-class 자체 subset이라 외부 방법과 head-to-head 불가 — 스코프를 "균등 분할·edge 예산"으로 명시.
+- **TCD(ICCV'21)의 NME-vs-CNN 발견과의 긴장 — 재검증 완료, 반전 없음.** TCD는 SSv2 전체(174cls, base-heavy 84:10/84:5 세션)에서 NME(prototype 계열, 우리 FeCAM과 정신 유사)가 CNN보다 못하다고 보고함 — 우리 결론("FeCAM > GRU")과 정면 충돌 가능성. **우리 48클래스를 TCD 스타일 base-heavy(24:6=4배, 36:6=6배)로 재구성해 true class-IL 재평가**한 결과, **반전은커녕 격차가 더 벌어짐**(최종정확도 Δ: 균등 +0.052 → moderate +0.048 → aggressive **+0.073**, FeCAM이 GRU+A-GEM의 거의 2배). **부수 발견**: GRU+A-GEM이 base 세션 직후 급락(aggressive에서 −65%)하는데, 원인은 A-GEM의 replay 메모리가 stage당 고정 50개라 base 클래스가 많을수록 클래스당 exemplar가 급감하기 때문(8.33→1.39개/class) — FeCAM과 무관한 우리 A-GEM 구현 자체의 개선점으로 별도 확인. 상세: `reports/base_heavy_split_result.md`. (TCD와의 차이는 backbone 성격 — frozen CLIP vs trained CNN — 가설이며 완전 검증은 영상 접근 복구 후 후속 과제.)
 - **GRU temporal head는 약함.** PIVOT의 temporal prompt, ESSENTIAL의 memory-retrieval cross-attention 같은 "숫자를 올리는" 장치가 없음.
 - **SSM은 우리 세팅에서 안 통함.** 16프레임 짧은 시퀀스에선 SSM의 길이 이점이 없음 — 버그가 아니라 예상된 결과(§5 Q3/Q4).
 
@@ -175,6 +200,18 @@ task-aware backward-transfer(S1 −0.061)와 시퀀스 입력 유지 정도이�
 업그레이드로 SLDA/프로토타입 head 채택을 검토 중(few-shot 등록이 밀리초로 단축). 새 방법을
 숨기지 않고 우리 스택에서 검증해 방향 전환 근거로 삼는 것 자체가 이 프로젝트의 방법론.
 
+**Q11. TCD(ICCV'21)는 SSv2에서 NME(FeCAM류)가 CNN보다 못하다는데, 이거랑 모순 아닌가?**
+좋은 지적이고 **직접 재검증했음**(`reports/base_heavy_split_result.md`). TCD와 같은
+base-heavy 구조(24:6=4배, 36:6=6배 — TCD 원본은 84:10=8.4배)로 우리 48클래스를 재편해
+true class-IL로 다시 평가한 결과, **반전이 안 일어났고 오히려 격차가 더 벌어짐**
+(FeCAM−GRU 격차가 균등 +0.052 → aggressive **+0.073**으로 확대). 대신 **GRU+A-GEM 쪽이
+base 세션 직후 −65% 급락**하는 걸 발견했는데, 원인은 A-GEM의 고정 replay 예산(stage당
+50개)이 base 클래스 수가 늘수록 클래스당 exemplar를 급감시키기 때문(8.33→1.39개/class)
+— FeCAM의 강점과는 별개인, 우리 A-GEM 구현의 개선 포인트로 확인. TCD와 결과가 다른 이유는
+**backbone 차이 가설**(TCD는 SSv2로 직접 학습한 CNN feature, 우리는 frozen CLIP — 모션
+정보가 원래 약한 feature는 평균내도 잃을 게 적음)이며, 완전 검증은 원본 174-class split
+재현이 필요(영상 접근 복구 후 후속).
+
 ---
 
 ## 빈칸 체크리스트 — 대부분 실측 완료 (`reports/measured_evidence.md`)
@@ -190,6 +227,7 @@ task-aware backward-transfer(S1 −0.061)와 시퀀스 입력 유지 정도이�
 9. ✅ **정밀 지표(precision/recall/F1/mAP)** — `reports/val_metrics_result.md`.
 10. ✅ **학습 세팅(initial vs continual)** — Stage1=6클래스 initial(replay 없음) : Stage2-8=42클래스 continual(growing A-GEM replay) = 1:7.
 11. ✅ **데모 앱 사용성 버그 수정** — OOD 배지가 기본 설정에선 `threshold=None`이라 **항상 미작동**이었음(사용해보다 발견). 앱 시작 시 자동 보정(real val feature 또는 Docker/Spaces용 synthetic fallback)으로 수정, calibration 유효성 검증(held-out ID FPR 4%≈목표 5%, feature-space OOD 42% 플래그). 회귀 테스트 추가.
+12. ✅ **TCD(ICCV'21) NME<CNN 반례 재검증** — base-heavy(4배/6배) 구조로 재평가해도 FeCAM 우위 유지·확대(+0.048/+0.073). GRU+A-GEM의 replay-dilution 취약점 별도 발견. (`reports/base_heavy_split_result.md`)
 
 ---
 
