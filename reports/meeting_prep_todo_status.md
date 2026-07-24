@@ -193,7 +193,7 @@ backbone 차이(TCD=SSv2 직접학습 CNN, 우리=frozen CLIP) 가설이며, 완
 ## 커밋 이력 (`feature/pycil-benchmarks` 브랜치, PR #2)
 
 ```text
-(pending) study: TCD base-heavy split re-validation — FeCAM lead holds/widens
+f5d4c39 study: TCD base-heavy split re-validation — FeCAM lead holds, widens
 ea6cb29 feat: PyCIL benchmark setup (CIFAR-100 + ImageNet) + analytic-head bridge
 e364e2c study: MobileCLIP-S0 edge-encoder benchmark — CPU latency inverts params
 f248d8b docs: pin official project focus — edge (CPU/embedded) continual learning for video
