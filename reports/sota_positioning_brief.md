@@ -38,16 +38,23 @@
 **"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열이고, 세 논문 원문을
 전부 직접 읽어 검증함**(검색 스니펫이 아니라 PDF 원문 확인, 아래 표는 전부 원문 출처):
 
-| 논문 | 발표 | split (SSv2, 174cls) | exemplar | 백본 | SSv2 정확도 |
+| 논문 | 발표 | split (SSv2, 174cls) | exemplar | 백본 | SSv2 정확도(10×9/5×18) |
 |---|---|---|---|---|---|
-| **TCD** ([arXiv:2203.13611](https://arxiv.org/abs/2203.13611), [GitHub](https://github.com/bellos1203/TCD)) | ICCV 2021 | 84 base + [10×9] / [5×18] | 20/class | ResNet-50+TSM, ImageNet-init, CIL 내내 fine-tune | CNN 35.78 / NME 28.88 (10-group) |
-| **STSP** ([PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) | ECCV 2024 | 84 base + [10×9] / [5×18] (TCD와 동일) | **0** (exemplar-free) | ResNet-50+TSM, 동일 초기화, gradient를 옛 특징 null space로 투영(SGP) | **69.68 / 70.87** (이 계열 최고) |
-| **CSTA** ([arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) | TCSVT 투고중(2025) | 동일 TCD 벤치 | **0**(표현) / 5개(fine-tune 보정)† | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26 (TCD 벤치 2위, STSP엔 크게 못 미침) |
+| **TCD** ([arXiv:2203.13611](https://arxiv.org/abs/2203.13611), [GitHub](https://github.com/bellos1203/TCD)) | ICCV 2021 | 84 base + [10×9]/[5×18] | 20/class | ResNet-50+TSM, ImageNet-init, CIL 내내 fine-tune | CNN **35.78/29.60** |
+| **STSP** ([PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) | ECCV 2024 | 동일 split | **0**(exemplar-free) | ResNet-50+TSM, gradient를 옛 특징 null space로 투영(SGP) | **69.68/70.87**(이 계열 최고) |
+| **CSTA** ([arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) | TCSVT 투고중(2025) | 동일 split | 0(표현)/5개(fine-tune 보정)† | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26/— (TCD 벤치 2위) |
+| **ESSENTIAL** ([arXiv:2508.10896](https://arxiv.org/abs/2508.10896), [GitHub](https://github.com/KHU-VLL/ESSENTIAL)) | ICCV 2025 Highlight | 동일 split | sparse(1~2프레임)+학습형 prompt | **frozen CLIP** + 학습형 temporal encoder + cross-attention 복원(MR 모듈) | 48.9/47.5 (메모리 8.4~8.6MiB — STSP의 1/68) |
 
 † CSTA는 "exemplar-free"를 표방하지만 fine-tuning 단계에서 이전 태스크 클래스당
 5개 샘플로 balanced set을 구성한다고 원문에 명시 — 인용 시 이 뉘앙스 확인 필요.
 
-**ESSENTIAL**(ICCV'25, §1(c)와 동일 논문)도 같은 TCD 벤치마크에서 SSv2를
+**ESSENTIAL이 이 계열에서 우리와 구조적으로 가장 가까움 — 유일하게 frozen 비주얼
+백본을 쓴다.** ESSENTIAL의 visual encoder는 CLIP이고 **한 번도 SSv2로 학습되지
+않음** — TCD/STSP/CSTA(전부 백본을 SSv2로 학습/적응)와 다름. 다만 그 위에 **학습형
+temporal encoder(transformer)**를 얹어 SSv2로 훈련하고, mean-pool/NME가 아니라 이
+학습된 표현으로 분류하므로 **NME<CNN 논쟁의 당사자는 아님**(그 축과는 무관한 별도
+기여 — "메모리 효율 vs 성능" 트레이드오프가 주제). vCLIMB 쪽에서는 §1(c)의 PIVOT/
+ESSENTIAL과 동일 계보(frozen CLIP + 경량 모듈)이자, TCD 벤치에서 SSv2를
 **"temporal-biased"** 난이도 스트레스 테스트로 명시적으로 사용.
 
 - **TCD의 결정적 발견 — 우리 결론과 정면으로 긴장, 직접 재검증 완료:** NME(prototype/
@@ -61,26 +68,28 @@
   정직하게 다루고 **직접 재검증**함(`reports/base_heavy_split_result.md`) — 결과: 반전
   없음, 오히려 격차 확대(§4 참고).
 
-- **세 논문 모두를 관통하는 축 — 우리와의 근본적 차이:** TCD·STSP·CSTA **셋 다 SSv2
+- **TCD·STSP·CSTA 세 논문을 관통하는 축 — 우리와의 근본적 차이:** 이 셋은 **SSv2
   영상으로 백본을 실제로 학습/fine-tune**한다(TCD·STSP는 gradient 전체 업데이트+제약,
-  CSTA는 어댑터를 학습). 즉 이 계열의 feature는 전부 **SSv2 모션에 노출되어 학습된
+  CSTA는 어댑터를 학습). 이 계열의 feature는 전부 **SSv2 모션에 노출되어 학습된
   표현**이다. 반면 우리는 **한 번도 SSv2로 학습되지 않은 frozen CLIP**을 쓴다 — 애초에
   평균내 잃을 "학습된 시간 정보"가 없으므로, TCD의 NME 경고가 우리에게 구조적으로 덜
-  적용된다는 설명이 세 논문 모두에서 일관되게 뒷받침됨.
+  적용된다는 설명이 세 논문 모두에서 일관되게 뒷받침됨. (ESSENTIAL은 예외 — 위 참고.)
 
-- **STSP 69.68/70.87 — 독립 교차검증 완료.** STSP는 공개 코드 저장소를 찾지 못했으나
-  (GitHub·awesome-list·ECCV 포스터 페이지 어디에도 코드 링크 없음), **ESSENTIAL(ICCV'25
-  Highlight)의 Table 2가 독립적으로 동일 값(69.7%/70.9%, 반올림 차이뿐)을 인용** —
-  CSTA에 이어 두 번째 독립 소스가 같은 수치를 보고하므로 전사 오류 가능성은 낮음. TCD
-  (35.78) 대비 거의 2배, 5×18(70.87)이 10×9(69.68)보다 높은 이례적 역전은 여전히 실제
-  현상이지만, STSP의 gradient-null-space 투영이 base 84클래스 성능을 거의 안 떨어뜨리는
-  메커니즘(논문 Fig. 4, base-class 정확도가 증분 내내 평평)으로 설명됨.
-  **단, 별도 caveat 하나 발견**: ESSENTIAL의 같은 표는 **TCD 자신의 수치를 29.3%/24.7%로
-  인용**하는데, 이는 TCD 원문에서 직접 확인한 35.78%/29.60%와 다름 — ESSENTIAL이 TCD를
-  **다른 백본(ViT)으로 재실행**해 인용한 것으로 보임(TCD 원본은 ResNet-50+TSM). 즉
-  **같은 baseline 방법도 어느 논문이 인용했느냐에 따라 수치가 갈릴 수 있음** — 우리
-  브리핑에선 항상 각 방법의 **원 논문 자체 보고치**(TCD 35.78/29.60, STSP 69.68/70.87)를
-  우선 인용하고, 제3자 재인용 수치는 쓰지 않기로 함.
+- **STSP 69.68/70.87 — 독립 교차검증 완료, 원문 재확인으로 caveat 해소.** STSP는 공개
+  코드 저장소를 찾지 못했으나(GitHub·awesome-list·ECCV 포스터 페이지 어디에도 코드
+  링크 없음), **ESSENTIAL(ICCV'25 Highlight) Table 2가 독립적으로 동일 값(69.7/70.9,
+  반올림 차이뿐)을 인용** — CSTA에 이어 두 번째 독립 소스가 같은 수치를 보고하므로
+  전사 오류 가능성은 낮음. TCD(35.78) 대비 거의 2배, 5×18(70.87)이 10×9(69.68)보다
+  높은 이례적 역전은 실제 현상이지만, STSP의 gradient-null-space 투영이 base 84클래스
+  성능을 거의 안 떨어뜨리는 메커니즘(논문 Fig. 4, base-class 정확도가 증분 내내 평평)
+  으로 설명됨.
+  **정정(이전 버전 오류 수정)**: 이전엔 "ESSENTIAL이 TCD를 29.3%/24.7%로 다르게
+  인용한다"고 별도 caveat으로 적었는데, **ESSENTIAL의 Table 2 원문을 직접 전부 읽어보니
+  오해였음** — 그 표엔 **TCD(ViT) 행(29.3/24.7, iCaRL/UCIR/L2P와 동일 백본으로 공정
+  재실행한 통제 비교)과 TCD(TSM) 행(35.8/29.6, TCD 원문과 정확히 일치)이 별도로
+  둘 다 존재**함. ESSENTIAL은 원 논문 수치와 공정 재구현 수치를 투명하게 병기한 것이지,
+  제3자가 원문과 다른 값을 몰래 인용한 게 아니었음 — **여전히 유효한 교훈은 "표를 볼 땐
+  백본 열까지 같이 확인하라"는 것**이지 "제3자 인용을 불신하라"가 아님으로 수정.
 
 - **우리와의 구조적 차이 (숫자를 직접 비교하면 안 되는 이유):** TCD 계열은 174클래스
   전체 + **base-heavy**(84:10=8.4배, 84:5=16.8배) 세션 구조. 우리는 48클래스 큐레이션
