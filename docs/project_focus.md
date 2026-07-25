@@ -67,8 +67,10 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
 7. **AUC-A/AUC-L 지표 채택** — 서베이의 메모리-불가지론 평가 방식. `benchmarks/pycil/`에
    동일 스플릿이 이미 깔려 있어 적용 비용이 낮음. 여기에 **연산 축(CPU 시간)을 추가**하는 게
    우리 차별점.
-8. **training FLOPs 병기** — 지금은 wall-clock만 보고 중. SparCL·CVPR'23이 쓰는 FLOPs를
-   같이 내면 하드웨어 무관 비교가 되어 두 논문과 나란히 놓을 수 있음.
+8. ~~training FLOPs 병기~~ — **완료 → [`reports/training_flops_result.md`](../reports/training_flops_result.md)**.
+   FeCAM 2.85 G vs GRU+A-GEM 4.64 T = **1,628배** 적음(SparCL은 backprop 희소화로 23배).
+   부산물로 **기존 학습시간 수치의 귀속 오류를 발견·정정**(FeCAM "8.7초"는 99.5%가 평가,
+   실제 fit은 42 ms)했고, **인코더가 head 학습의 24만 배**라는 사실도 정량화됨.
 9. **iteration-budget 프로토콜로도 보고**(CVPR'23 방식) — "step당 N iteration" 형식을 추가하면
    그들 대규모 결과와 직접 비교 가능해짐.
 

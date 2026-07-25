@@ -250,7 +250,8 @@ synthetic in-distribution 샘플로 폴백)하도록 고쳤고, held-out 데이�
 날카로운 질문이고, **직접 실측해서 정직하게 답함**(`reports/cpu_friendly_methods_result.md`):
 frozen feature 위에서 backprop·replay 버퍼 모두 없는 통계 계열이 우세 — Deep SLDA('20)가
 task-aware 동률(0.390), **최신 FeCAM(NeurIPS'23, shared-cov)은 전 지표 신기록: task-aware
-0.410(+2.3%p), full-48-way 0.157(+50%), 학습 8.7초(30배 빠름)**. RanDumb(NeurIPS'24)의
+0.410(+2.3%p), full-48-way 0.157(+50%), 학습 42밀리초(6,400배 빠름 —
+training FLOPs로는 1,628배 적음, `reports/training_flops_result.md`)**. RanDumb(NeurIPS'24)의
 "랜덤 표현이 학습된 표현을 이긴다"는 주장도 재현됨(RFF+SLDA 0.395/0.145, 0.9초).
 이는 우리 핵심 결론("frozen feature 위에선 복잡도가 병목이 아니다")을 **한 단계 더 일반화**하는
 발견 — 아키텍처뿐 아니라 **gradient 학습 자체도 필수가 아님**. GRU+A-GEM에 남는 고유 강점은
