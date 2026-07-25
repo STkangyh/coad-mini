@@ -39,6 +39,13 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
 
 ## 이 프레이밍이 드러내는 갭 (다음 단계 후보)
 
+> **선행 조사로 갭이 실재함을 확인함 → [`reports/pycil_survey_edge_gap.md`](../reports/pycil_survey_edge_gap.md).**
+> 이 분야 표준 서베이(Zhou et al., TPAMI 2024, PyCIL 저자 그룹)는 edge 배포를 명시적
+> 동기로 내걸지만 **측정은 메모리 바이트뿐 — 38쪽 전문에 "CPU" 0회, FLOPs 0회, 전력 0회**,
+> 유일한 시간 측정도 3090 GPU. 스스로 "computationally-efficient algorithm 설계"를 미래
+> 과제로 남김. **우리 CPU-only 실측이 정확히 그 빈칸에 들어감.** 단, 서베이가 지목한
+> 선행연구 2편(SparCL NeurIPS'22 / Prabhu CVPR'23)은 아직 미확인 — 아래 6번.
+
 1. **실제 embedded 하드웨어 실측 없음** — 지금 수치는 Mac CPU. Jetson(Orin Nano 등)/
    Raspberry Pi 급에서 학습·추론 시간, (가능하면) 전력 측정이 논문 설득력을 크게 올림.
 2. **CLIP 인코더가 추론 병목** (156ms/window) — edge용 경량 비전 인코더(MobileCLIP,
@@ -51,6 +58,13 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
    one-pass 세팅으로 전 방법 통일 비교하면 edge 서사가 완성됨.
 4. **에너지/메모리 프로파일** — RAM peak은 있고(0.95GB), 전력은 미측정.
 5. 데모의 embedded 배포 (예: Jetson에서 Docker 이미지 구동 확인).
+6. **선행연구 2편 원문 확인 (우선순위 높음)** — 서베이가 이 방향의 기존 연구로 지목한
+   **SparCL: Sparse Continual Learning on the Edge**(NeurIPS'22)와
+   **Computationally Budgeted Continual Learning**(CVPR'23, GDumb 저자). 우리 기여와
+   겹치는지/보완적인지 확인해야 "빈칸"이라는 주장이 최종 확정됨.
+7. **AUC-A/AUC-L 지표 채택** — 서베이의 메모리-불가지론 평가 방식. `benchmarks/pycil/`에
+   동일 스플릿이 이미 깔려 있어 적용 비용이 낮음. 여기에 **연산 축(CPU 시간)을 추가**하는 게
+   우리 차별점.
 
 ## 관련 문서
 
