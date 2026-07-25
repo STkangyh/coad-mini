@@ -1,15 +1,33 @@
-# PyCIL 저자 그룹 서베이의 "edge/resource-constrained" 취급 — 원문 전수 조사
+# edge/resource-constrained CL 선행연구 조사 — 서베이 + 지목된 2편 원문 확인
 
-Generated: 2026-07 (auto). 대상: **Zhou et al., "Class-Incremental Learning: A Survey"**
-([arXiv:2302.03648](https://arxiv.org/abs/2302.03648), v2 2024-07, **TPAMI**, 38쪽,
-[코드](https://github.com/zhoudw-zdw/CIL_Survey/)) — PyCIL을 만든 바로 그 그룹(난징대 LAMDA
-+ NTU)이 쓴 이 분야의 표준 서베이.
+Generated: 2026-07 (auto). 조사 대상 3편(전부 PDF 원문 정독):
+1. **Zhou et al., "Class-Incremental Learning: A Survey"**
+   ([arXiv:2302.03648](https://arxiv.org/abs/2302.03648), v2 2024-07, **TPAMI**, 38쪽,
+   [코드](https://github.com/zhoudw-zdw/CIL_Survey/)) — PyCIL을 만든 그룹의 표준 서베이
+2. **SparCL: Sparse Continual Learning on the Edge**
+   ([NeurIPS 2022](https://papers.neurips.cc/paper_files/paper/2022/file/80133d0f6eccaace15508f91e3c5a93c-Paper-Conference.pdf),
+   [코드](https://github.com/neu-spiral/SparCL)) — 서베이가 "resource-limited" 선행연구로 지목
+3. **Computationally Budgeted Continual Learning: What Does Matter?**
+   ([arXiv:2303.11165](https://arxiv.org/abs/2303.11165), **CVPR 2023**,
+   [코드](https://github.com/drimpossible/BudgetCL)) — 서베이가 "computational budget" 선행연구로 지목
 
 목적: 우리 edge-CL 프레이밍(`docs/project_focus.md`)이 **이미 다뤄진 주제인지, 아니면
-빈 구멍인지**를 원문 근거로 확정. PDF 전문 텍스트를 추출해 키워드 전수 검색 + 해당 구절
-정독으로 확인했다.
+빈 구멍인지**를 원문 근거로 확정.
 
-## 요약 (한 줄)
+## 요약 — 갭은 "부분적으로만" 열려 있다 (초기 판단 수정)
+
+| 주장 | 판정 |
+|---|---|
+| "표준 서베이가 CPU/연산 축을 안 다룬다" | ✅ **사실** — 38쪽에 "CPU" 0회, 전 실험 3090 GPU |
+| "아무도 실제 기기 CPU 학습을 측정 안 했다" | ❌ **거짓** — **SparCL이 갤럭시 S20 CPU에서 학습 가속 3.1× 실측** |
+| "연산 예산 고정 CL 연구가 없다" | ❌ **거짓** — CVPR'23이 대규모로 수행(1500 GPU-hours) |
+| "**비디오** CIL에서 CPU/지연 측정이 없다" | ✅ **사실** — TCD/STSP/CSTA/ESSENTIAL 전부 미측정 |
+| "**backprop 자체를 제거**한 edge CL 비교가 없다" | ✅ **사실** — SparCL은 backprop을 *희소화*할 뿐 |
+
+**결론: 우리 기여는 "edge CL 최초"가 아니라 "비디오 CIL × backprop-free × 절대 CPU
+wall-clock"의 교집합.** 재료는 각각 선행연구가 있으나 이 조합은 비어 있다. 아래 §5 참조.
+
+## (1) 서베이 — edge를 "메모리 예산"으로만 정의
 
 **이 서베이는 edge를 "메모리 예산(바이트)" 문제로만 정의하고 그 축은 정교하게 다루지만,
 "연산 예산(CPU·지연·전력)" 축은 미래 과제로 넘긴 채 실험을 전혀 하지 않는다. 전 실험이
@@ -88,42 +106,99 @@ on a single NVIDIA 3090 GPU."** exemplar를 늘리면 성능은 오르지만 학
 > training CIL systems under **resource-limited** scenarios. Another important
 > characteristic is the **computational budget** [228]."
 
-인용된 두 편 = 이 방향의 선행연구로 **우리가 반드시 확인해야 할 논문**:
-- **[227] SparCL: Sparse Continual Learning on the Edge** (Wang et al., **NeurIPS 2022**)
-- **[228] Computationally Budgeted Continual Learning: What does matter?**
-  (Prabhu et al., **CVPR 2023** — GDumb 저자)
+인용된 두 편 = 이 방향의 선행연구. **둘 다 원문 확인 완료 → §3, §4.**
 
-## 3. 우리 프로젝트에 주는 결론
+## (2) SparCL (NeurIPS'22) — 진짜 폰 CPU 학습 실측이 존재함
 
-### 갭이 실재함 (논문 §Introduction에 그대로 쓸 수 있음)
+**우리 초기 갭 주장을 부분적으로 반박하는 논문.** 반드시 인용해야 함.
 
-이 분야의 **표준 서베이(TPAMI)가 edge 배포를 명시적 동기로 내걸었으면서도**:
-- 측정한 건 **메모리 바이트**뿐 — **CPU 실행, 지연, 전력은 하나도 측정 안 함**
-- 유일한 시간 측정조차 **3090 GPU** 위에서 수행
-- "computationally-efficient algorithms 설계가 필요하다"고 **스스로 미래 과제로 명시**
+- **방법**: 3종 희소화의 시너지 — **TDM**(task-aware dynamic masking, 가중치 희소성)
+  + **DDR**(dynamic data removal, "쉬운" 샘플 제거) + **DGM**(dynamic gradient masking,
+  중요 gradient만 업데이트)
+- **여전히 backprop을 함** — Algorithm 1에 명시: *"Update θ ⊙ M_θ via backpropagation."*
+  즉 backprop을 **없애는** 게 아니라 **희소하게** 만드는 접근.
+- **백본**: ResNet-18, **사전학습 없이 from scratch**("without any pre-training")
+- **벤치마크**: Split CIFAR-10(5 task), Split Tiny-ImageNet(10 task) — **전부 이미지, 비디오 아님**
+- **⭐ 실제 기기 측정**: *"measured on the **CPU** of an off-the-shelf **Samsung Galaxy S20**
+  smartphone, Qualcomm **Snapdragon 865**, Kryo 585 Octa-core CPU"*, batch 32
+  → **학습 가속 3.1×**(sparsity 0.95) / **2.3×**(0.90), 메모리 풋프린트 51%/48% 절감
+- **지표**: Class-IL/Task-IL 정확도 + **training FLOPs** + memory footprint
+- **성과**: DER++ 대비 최대 **23× 적은 training FLOPs**, 정확도는 오히려 최대 **+1.7%**
+- 논문 자체 주장: *"We are not aware of any prior CL works that explored this area and
+  considered the constraints of limited resources during training."*
 
-→ **우리의 CPU-only 실측(학습 초 단위, RAM 0.95GB, backprop-free)은 이 서베이가 비워둔
-바로 그 칸에 들어간다.** "메모리는 정렬했지만 연산은 정렬 안 된 비교"에 **연산 축을
-추가**하는 것이 우리 기여로 정당화됨.
+참고로 SparCL Table 1(Split CIFAR-10, buffer 200)의 **A-GEM Class-IL 20.04 / Task-IL 83.88**
+— 우리 브리핑이 A-GEM을 "레거시 baseline"으로 규정한 근거와 독립적으로 일치.
 
-### 즉시 채택할 것 (방법론 차용)
+## (3) Computationally Budgeted CL (CVPR'23) — 연산 예산을 "iteration 수"로 추상화
 
-1. **AUC-A / AUC-L 지표** — 예산을 바꿔가며 성능-메모리 곡선을 그려 확장성을 보고하는
-   방식. 우리 `benchmarks/pycil/` 브리지에 이미 같은 스플릿이 깔려 있으므로 적용 비용이 낮다.
-2. **모델→exemplar 환산 회계**(§4.4) — 우리 FeCAM head(2.1MB)·GRU(604K params)를
-   "exemplar 몇 장 상당"으로 환산해 보고하면 서베이 관례와 정렬된다.
-3. **"no free lunch / 교차점" 프레이밍** — 서베이 스스로 "작은 예산에선 다른 계열이
-   이긴다"고 인정했으므로, **우리가 겨냥하는 저예산 구간이 정당한 연구 영역**임을
-   서베이 문장으로 직접 뒷받침할 수 있다.
+- **저자**: Prabhu et al.(GDumb 저자) — Oxford/KAUST/Meta AI
+- **핵심 설계**: 연산 예산 **C = training iteration 수**로 정의. 명시적 이유:
+  *"This avoids **hardware dependency** or suboptimal implementations when comparing
+  methods."* → **의도적으로 하드웨어를 추상화**했으므로 CPU/지연 실측은 없음.
+- **하드웨어**: 전부 **A100 GPU**, 총 **1500 GPU-hours**
+- **모델**: ResNet-50, **ImageNet1K 사전학습**(= PTM 트랙)
+- **데이터**: **ImageNet2K**(2000클래스), **CGLM**(Continual Google Landmarks V2) — 대규모
+- **세팅**: data-incremental / class-incremental / **time-incremental**(업로드 타임스탬프 순)
+- **예산**: ImageNet2K는 step당 400 iter(batch 1500), CGLM은 100 iter → 매 스텝 관측
+  데이터의 25~50%만 학습 가능
+- **⭐ 결론 1**: *"**None** of the proposed CL algorithms can outperform our simple
+  baseline when computation is restricted."* — Naive(메모리에서 균등 샘플링)를
+  distillation/sampling/FC-correction 계열 **전부가** 못 이김.
+- **⭐ 결론 2**: *"The gap between existing CL algorithms and our baseline **becomes
+  larger with harsher compute restrictions**."*
+- **⭐ 결론 3 (우리에게 가장 중요)**: *"training a **minimal subset of the model** with a
+  linear layer **can close the performance gap**... but **only when supported by strong
+  pretrained models**."* → **frozen 사전학습 + 최소 학습**이 연산 제약 하에서 유효하다는
+  독립 증거. 우리 접근의 정당성을 대규모 이미지 실험이 뒷받침.
+- **경제 논거**: 저장은 싸고(구글 클라우드 2¢/GB/월) 연산은 비싸다($3/시간 A100) —
+  *"computational costs for running an experiment far outweigh the costs for storing
+  replay samples"*. **메모리 제약보다 연산 제약이 현실적**이라는 주장.
 
-### 후속 확인 필요 (미착수)
+## 4. 우리 결론과의 정합성 (독립 corroboration)
 
-- **SparCL(NeurIPS'22)** 원문 — 진짜 edge CL 선행연구. 우리와 겹치는지/보완적인지 확인 필수.
-- **Prabhu et al.(CVPR'23)** 원문 — "연산 예산 고정" 프로토콜. 우리 CPU 실측을 이 프로토콜에
-  맞추면 비교 가능성이 생김.
-- 두 편 모두 확인 후 `docs/project_focus.md`의 갭 목록을 갱신할 것.
+CVPR'23의 결론 1·2는 **우리가 자체 실험에서 본 것과 같은 방향**이다:
 
-## 4. 재현
+| 그들(ImageNet2K/CGLM, A100, iteration 제약) | 우리(SSv2 48cls, CPU, backprop 제약) |
+|---|---|
+| 연산 제약 시 정교한 CL 알고리즘이 Naive를 못 이김 | frozen feature 위에서 FeCAM/SLDA가 GRU+A-GEM을 이김 |
+| 제약이 심할수록 격차 확대 | base-heavy(예산 희석) 시 격차 확대(`base_heavy_split_result.md`) |
+| frozen 사전학습 + 최소 학습이 갭을 메움 | frozen CLIP + 통계 head가 최고 성능 |
+
+→ **우리 발견이 우리 벤치 특유의 현상이 아님**을 대규모 이미지 연구가 독립적으로 뒷받침.
+`reports/pycil_bridge_result.md`(CIFAR-100 교차검증)와 함께 인용하면 강력.
+
+## 5. 수정된 갭 주장 (논문 §Introduction용)
+
+**쓸 수 없는 문장** ❌: "edge/CPU에서 CL 학습 비용을 측정한 연구가 없다" → SparCL이 반박.
+
+**방어 가능한 문장** ✅:
+1. **도메인**: edge CL 실측은 **이미지**에만 존재(SparCL: CIFAR/Tiny-ImageNet).
+   **비디오 CIL 계보(TCD·STSP·CSTA·ESSENTIAL)에는 CPU·지연·전력 측정이 전무**
+   (`sota_positioning_brief.md` §1(f) 4편 원문 확인). 비디오는 프레임 축 때문에 연산
+   프로파일이 이미지와 질적으로 다르므로 별도 측정이 필요하다.
+2. **메커니즘**: SparCL은 backprop을 **희소화**(2.3~3.1× 가속). 우리는 backprop을
+   **제거**(닫힌해/스트리밍 통계, 자체 측정 ~30× 빠름). **다른 레버, 다른 크기의 효과**.
+3. **지표**: SparCL은 *상대* 가속률, CVPR'23은 *하드웨어 추상화된* iteration 수를 보고.
+   **"CPU에서 절대 몇 초에 학습되는가"를 보고하는 연구는 셋 다 아님** — 우리 절대
+   wall-clock(학습 초 단위, RAM 0.95GB)이 그 칸을 채운다.
+4. **표준 서베이가 이 축을 안 다룸**은 여전히 사실(§1) — 즉 이 방향이 **주류 평가
+   프로토콜에 편입되지 않았다**는 문제 제기는 유효.
+
+## 6. 즉시 채택할 것 (방법론 차용)
+
+1. **AUC-A / AUC-L 지표**(서베이 §4.5) — 예산별 성능 곡선의 면적. `benchmarks/pycil/`에
+   같은 스플릿이 이미 있어 적용 비용 낮음. **여기에 연산 축을 추가**하는 게 우리 차별점.
+2. **모델→exemplar 환산 회계**(서베이 §4.4) — FeCAM head(2.1MB)·GRU(604K params)를
+   "exemplar 몇 장 상당"으로 환산 보고.
+3. **"no free lunch / 교차점"**(서베이) — 저예산 구간이 정당한 연구 영역임을 서베이
+   문장으로 직접 뒷받침.
+4. **training FLOPs 보고**(SparCL) — 우리는 지금 wall-clock만 보고 중. FLOPs를 같이
+   내면 하드웨어 무관 비교가 가능해져 SparCL/CVPR'23과 나란히 놓을 수 있다. **미착수**.
+5. **iteration-budget 프로토콜**(CVPR'23) — 우리 CPU 실측을 "step당 N iteration" 형식으로도
+   보고하면 그들 결과와 직접 비교 가능. **미착수**.
+
+## 7. 재현
 
 ```bash
 curl -sL https://arxiv.org/pdf/2302.03648 -o survey.pdf && pdftotext survey.pdf survey.txt

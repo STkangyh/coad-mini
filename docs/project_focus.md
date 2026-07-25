@@ -39,12 +39,17 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
 
 ## 이 프레이밍이 드러내는 갭 (다음 단계 후보)
 
-> **선행 조사로 갭이 실재함을 확인함 → [`reports/pycil_survey_edge_gap.md`](../reports/pycil_survey_edge_gap.md).**
-> 이 분야 표준 서베이(Zhou et al., TPAMI 2024, PyCIL 저자 그룹)는 edge 배포를 명시적
-> 동기로 내걸지만 **측정은 메모리 바이트뿐 — 38쪽 전문에 "CPU" 0회, FLOPs 0회, 전력 0회**,
-> 유일한 시간 측정도 3090 GPU. 스스로 "computationally-efficient algorithm 설계"를 미래
-> 과제로 남김. **우리 CPU-only 실측이 정확히 그 빈칸에 들어감.** 단, 서베이가 지목한
-> 선행연구 2편(SparCL NeurIPS'22 / Prabhu CVPR'23)은 아직 미확인 — 아래 6번.
+> **선행연구 3편 원문 조사 완료 → [`reports/pycil_survey_edge_gap.md`](../reports/pycil_survey_edge_gap.md).
+> 갭은 "부분적으로만" 열려 있음 — 주장을 좁혀야 함.**
+> 표준 서베이(Zhou et al., TPAMI'24)는 edge를 **메모리 바이트로만** 다룸(38쪽에 "CPU" 0회,
+> 전 실험 3090). 그러나 **SparCL(NeurIPS'22)은 갤럭시 S20 CPU에서 학습 3.1× 가속을 실측**했고,
+> **CVPR'23(Prabhu)은 연산예산 고정 CL을 1500 GPU-hours로 수행**함. 따라서
+> ❌ "edge/CPU CL 측정이 없다"는 못 씀. ✅ 방어 가능한 건 **① 비디오 CIL 계보엔 CPU·지연
+> 측정이 전무, ② SparCL은 backprop을 *희소화*할 뿐 우리처럼 *제거*하지 않음,
+> ③ 절대 CPU wall-clock을 보고하는 연구는 셋 다 없음** — 즉 우리 기여는
+> "**비디오 × backprop-free × 절대 CPU 시간**"의 교집합.
+> **보너스**: CVPR'23의 결론("연산 제약 시 정교한 CL이 Naive를 못 이김", "frozen 사전학습 +
+> 최소 학습이 갭을 메움")은 우리 자체 발견과 같은 방향 — 대규모 이미지 실험의 독립 뒷받침.
 
 1. **실제 embedded 하드웨어 실측 없음** — 지금 수치는 Mac CPU. Jetson(Orin Nano 등)/
    Raspberry Pi 급에서 학습·추론 시간, (가능하면) 전력 측정이 논문 설득력을 크게 올림.
@@ -58,13 +63,14 @@ Confirmed: 2026-07 (교수님 면담 후 확정).
    one-pass 세팅으로 전 방법 통일 비교하면 edge 서사가 완성됨.
 4. **에너지/메모리 프로파일** — RAM peak은 있고(0.95GB), 전력은 미측정.
 5. 데모의 embedded 배포 (예: Jetson에서 Docker 이미지 구동 확인).
-6. **선행연구 2편 원문 확인 (우선순위 높음)** — 서베이가 이 방향의 기존 연구로 지목한
-   **SparCL: Sparse Continual Learning on the Edge**(NeurIPS'22)와
-   **Computationally Budgeted Continual Learning**(CVPR'23, GDumb 저자). 우리 기여와
-   겹치는지/보완적인지 확인해야 "빈칸"이라는 주장이 최종 확정됨.
+6. ~~선행연구 2편 원문 확인~~ — **완료**(위 박스). 결과적으로 갭 주장을 좁혔음.
 7. **AUC-A/AUC-L 지표 채택** — 서베이의 메모리-불가지론 평가 방식. `benchmarks/pycil/`에
    동일 스플릿이 이미 깔려 있어 적용 비용이 낮음. 여기에 **연산 축(CPU 시간)을 추가**하는 게
    우리 차별점.
+8. **training FLOPs 병기** — 지금은 wall-clock만 보고 중. SparCL·CVPR'23이 쓰는 FLOPs를
+   같이 내면 하드웨어 무관 비교가 되어 두 논문과 나란히 놓을 수 있음.
+9. **iteration-budget 프로토콜로도 보고**(CVPR'23 방식) — "step당 N iteration" 형식을 추가하면
+   그들 대규모 결과와 직접 비교 가능해짐.
 
 ## 관련 문서
 
