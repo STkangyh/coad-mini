@@ -34,28 +34,55 @@
 - S4(ICLR'22), S5(ICLR'23), Mamba(2023), Vision Mamba(ICML'24), VideoMamba(ECCV'24). 전부 강점이 **길이(long-range)** 에서 나옴. "Repeat After Me"(ICML'24)는 고정 상태 SSM이 짧은 문맥 recall에서 이론적으로 불리함을 증명.
 
 **(f) TCD 계열 — SSv2 자체를 CIL 벤치마크로 쓴 연구 (우리 데이터셋 선택과 가장 직접 겹침)**
-- **"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열.** 원조는
-  **TCD**(Park et al., **ICCV 2021**, [arXiv:2203.13611](https://arxiv.org/abs/2203.13611) ·
-  [GitHub](https://github.com/bellos1203/TCD)) — UCF101·HMDB51·**SSv2** 세 데이터셋에
-  CIL split을 처음 구성. SSv2 174클래스 전체를 **84-class base session + 나머지를
-  10개씩 또는 5개씩** 묶은 incremental task로 나눔(= base-heavy/FSCIL에 가까운 구조).
-  Time-channel importance map + knowledge distillation로 망각 완화.
-- 후속: **CSTA**(2025, exemplar-free, [arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) —
-  같은 TCD 프로토콜(84 base + 90개를 9개씩 10 session), SSv2 정확도 **41.26%**(TimeFormer).
-  **STSP**(**ECCV 2024**, [PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) —
-  직교 subspace 분류기 + gradient를 과거 클래스 spatial feature의 null space로 투영(우리
-  A-GEM의 gradient projection과 결이 비슷, 적용 방식은 다름), SSv2 **69.68%**(이 계열 최고).
-  **ESSENTIAL**(ICCV'25, §1(c)와 동일 논문)도 같은 TCD 벤치마크에서 SSv2를
-  **"temporal-biased"** 난이도 스트레스 테스트로 명시적으로 사용.
-- **TCD의 결정적 발견 — 우리 결론과 정면으로 긴장:** NME(prototype/mean-embedding
-  분류기, 우리 FeCAM과 정신이 비슷)가 **SSv2에서 CNN보다 못함** — 프레임을 단순 평균내면
-  SSv2가 요구하는 시간적 추론 정보가 사라지기 때문. 우리는 정반대로 "mean-pool FeCAM이
-  GRU를 이긴다"를 결론으로 냈으므로, **이 긴장을 정직하게 다루고 직접 재검증**함
-  (`reports/base_heavy_split_result.md`).
+
+**"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열이고, 세 논문 원문을
+전부 직접 읽어 검증함**(검색 스니펫이 아니라 PDF 원문 확인, 아래 표는 전부 원문 출처):
+
+| 논문 | 발표 | split (SSv2, 174cls) | exemplar | 백본 | SSv2 정확도 |
+|---|---|---|---|---|---|
+| **TCD** ([arXiv:2203.13611](https://arxiv.org/abs/2203.13611), [GitHub](https://github.com/bellos1203/TCD)) | ICCV 2021 | 84 base + [10×9] / [5×18] | 20/class | ResNet-50+TSM, ImageNet-init, CIL 내내 fine-tune | CNN 35.78 / NME 28.88 (10-group) |
+| **STSP** ([PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) | ECCV 2024 | 84 base + [10×9] / [5×18] (TCD와 동일) | **0** (exemplar-free) | ResNet-50+TSM, 동일 초기화, gradient를 옛 특징 null space로 투영(SGP) | **69.68 / 70.87** (이 계열 최고) |
+| **CSTA** ([arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) | TCSVT 투고중(2025) | 동일 TCD 벤치 | **0**(표현) / 5개(fine-tune 보정)† | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26 (TCD 벤치 2위, STSP엔 크게 못 미침) |
+
+† CSTA는 "exemplar-free"를 표방하지만 fine-tuning 단계에서 이전 태스크 클래스당
+5개 샘플로 balanced set을 구성한다고 원문에 명시 — 인용 시 이 뉘앙스 확인 필요.
+
+**ESSENTIAL**(ICCV'25, §1(c)와 동일 논문)도 같은 TCD 벤치마크에서 SSv2를
+**"temporal-biased"** 난이도 스트레스 테스트로 명시적으로 사용.
+
+- **TCD의 결정적 발견 — 우리 결론과 정면으로 긴장, 직접 재검증 완료:** NME(prototype/
+  mean-embedding 분류기, 우리 FeCAM과 정신이 비슷)가 **SSv2에서 CNN보다 6.9~8.0%p
+  낮음** — TCD 원문 인용: *"for Something-Something V2, the performance for NME
+  falls behind CNN... naïve averaging of the features from all frames may not be
+  suitable."* 이유는 원문으로 확정됨: TCD의 백본(ResNet-50+TSM)은 ImageNet에서
+  시작해 **CIL 내내 SSv2 영상으로 계속 fine-tune**되므로, NME가 계산되는 feature 자체가
+  **학습되어 모션 정보를 담은** feature다 — 그걸 프레임 평균내면 그 정보가 파괴된다.
+  우리는 정반대로 "mean-pool FeCAM이 GRU를 이긴다"를 결론으로 냈으므로, 이 긴장을
+  정직하게 다루고 **직접 재검증**함(`reports/base_heavy_split_result.md`) — 결과: 반전
+  없음, 오히려 격차 확대(§4 참고).
+
+- **세 논문 모두를 관통하는 축 — 우리와의 근본적 차이:** TCD·STSP·CSTA **셋 다 SSv2
+  영상으로 백본을 실제로 학습/fine-tune**한다(TCD·STSP는 gradient 전체 업데이트+제약,
+  CSTA는 어댑터를 학습). 즉 이 계열의 feature는 전부 **SSv2 모션에 노출되어 학습된
+  표현**이다. 반면 우리는 **한 번도 SSv2로 학습되지 않은 frozen CLIP**을 쓴다 — 애초에
+  평균내 잃을 "학습된 시간 정보"가 없으므로, TCD의 NME 경고가 우리에게 구조적으로 덜
+  적용된다는 설명이 세 논문 모두에서 일관되게 뒷받침됨.
+
+- **STSP 69.68/70.87 관련 정직한 caveat:** TCD(35.78) 대비 거의 2배로 크고, 5×18(더
+  잘게 쪼갠 세팅, 70.87)이 10×9(69.68)보다 오히려 높은 이례적 역전이 있음 — STSP의
+  gradient-null-space 투영이 base 84클래스 성능을 거의 안 떨어뜨리는 메커니즘(논문
+  Fig. 4에서 base-class 정확도가 증분 내내 평평)으로 설명은 되지만, 격차가 예상보다
+  커서 **직접 인용 전 STSP 공개 코드/로그 재확인 권장**(CSTA도 동일 수치를 인용하니
+  최소 두 논문이 같은 값을 보고하긴 함).
+
 - **우리와의 구조적 차이 (숫자를 직접 비교하면 안 되는 이유):** TCD 계열은 174클래스
   전체 + **base-heavy**(84:10=8.4배, 84:5=16.8배) 세션 구조. 우리는 48클래스 큐레이션
   subset + **균등**(6:6=1배) 세션 구조. 클래스 범위·세션 skew가 다르므로 정확도를
   직접 갖다 비교할 수 없고, "균등 분할·edge 예산" 조건으로 스코프를 명시적으로 좁혀야 함.
+
+- **후속 아이디어(미실행)**: STSP의 subspace-거리 분류·직교 제약은 우리 FeCAM(공분산
+  기반)과 사촌 관계 — frozen CLIP 위에 STSP식 subspace 분류를 얹는 경량 변형을
+  실험해볼 여지가 있음(백본 학습 없이 닫힌해로 subspace만 추정, CPU 친화적).
 
 ---
 
