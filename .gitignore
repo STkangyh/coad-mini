@@ -36,3 +36,6 @@ dev/pipeline_driver.py
 
 # ── Third-party checkouts (PyCIL etc. — see benchmarks/pycil/README.md) ──
 external/
+
+# UCF101 raw videos (6.5GB, download via scripts/get_ucf101.sh)
+data/ucf101/
