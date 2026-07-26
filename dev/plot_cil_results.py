@@ -94,7 +94,8 @@ def fig_ucf101():
     ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
               fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=4)
     fig.tight_layout()
-    fig.savefig(OUT / "ucf101_tcd_curves.png", dpi=200, facecolor=SURFACE)
+    for ext in ("png", "svg"):
+        fig.savefig(OUT / f"ucf101_tcd_curves.{ext}", dpi=200, facecolor=SURFACE)
     plt.close(fig)
 
 
@@ -123,7 +124,8 @@ def fig_cifar_bridge():
     ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
               fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=3)
     fig.tight_layout()
-    fig.savefig(OUT / "cifar100_bridge.png", dpi=200, facecolor=SURFACE)
+    for ext in ("png", "svg"):
+        fig.savefig(OUT / f"cifar100_bridge.{ext}", dpi=200, facecolor=SURFACE)
     plt.close(fig)
 
 
@@ -176,7 +178,8 @@ def fig_increment_sensitivity():
     ax.text(0, 1.06, "UCF101, each paper's own reported numbers",
             transform=ax.transAxes, color=INK_2, fontsize=10)
     fig.tight_layout()
-    fig.savefig(OUT / "increment_sensitivity.png", dpi=200, facecolor=SURFACE)
+    for ext in ("png", "svg"):
+        fig.savefig(OUT / f"increment_sensitivity.{ext}", dpi=200, facecolor=SURFACE)
     plt.close(fig)
 
 
@@ -185,7 +188,7 @@ def main():
     fig_ucf101()
     fig_cifar_bridge()
     fig_increment_sensitivity()
-    for p in sorted(OUT.glob("*.png")):
+    for p in sorted(OUT.glob("*.*")):
         print(f"  {p.relative_to(ROOT)}  ({p.stat().st_size//1024} KB)")
 
 

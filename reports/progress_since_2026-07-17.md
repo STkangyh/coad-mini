@@ -1,276 +1,276 @@
-# 진행 사항 — 2026-07-17 이후
+# 진행 사항 — 2026-07-20 이후 (미팅용 종합)
 
-Generated: 2026-07-26. 범위: `e364e2c`(07-16, 직전 작업) **이후 12커밋**
-(`ea6cb29`…`6aa3c3a`). 23개 파일, +2,078 / −31 줄.
-전체 맥락은 [`reports/meeting_prep_todo_status.md`](meeting_prep_todo_status.md),
-프로젝트 프레이밍은 [`docs/project_focus.md`](../docs/project_focus.md) 참조.
+Generated: 2026-07-27. 범위: **21커밋**(`ea6cb29` 07-22 … `19c41f3` 07-27),
+37개 파일, +4,266 / −31 줄. 발표용 스크립트는
+[`reports/meeting_script_0726.md`](meeting_script_0726.md).
 
 ---
 
 ## 한눈에
 
-| # | 작업 | 결과 | 산출물 |
-|---|---|---|---|
-| 1 | **PyCIL 표준 벤치마크 구축 + 브리지** | 우리 head 서열(FeCAM>SLDA>NCM)이 CIFAR-100에서 그대로 재현 | `benchmarks/pycil/`, `pycil_bridge_result.md` |
-| 2 | **TCD 반례 재검증 실험** | 반전 없음, 오히려 격차 확대(+0.052→+0.073) | `dev/run_base_heavy_split.py`, `base_heavy_split_result.md` |
-| 3 | **SSv2-CIL 논문 4편 원문 정독** | "SSv2로 CIL이 새롭다"는 주장 반증, 인용 필수 계보 확정 | `sota_positioning_brief.md` §1(f) |
-| 4 | **edge-CL 갭 감사(3편)** | 갭이 부분적으로만 열림 → **주장 축소** | `pycil_survey_edge_gap.md` |
-| 5 | **FLOPs 회계(학습+추론)** | FeCAM이 GRU 대비 학습 1,628배 적은 연산 | `dev/compute_flops.py`, `flops_result.md` |
-| 6 | **FeCAM 채점 최적화 + 재배포** | 248배 가속, 출력 불변, HF Space 반영 | `src/models/fecam_head.py` |
-
-**정정 2건 발생** — 아래 §정정 참조. 테스트 68 → **70 passed**.
-
----
-
-## 1. PyCIL 표준 벤치마크 구축 + 브리지 실험 (07-22)
-
-**동기:** "우리 결론이 자체 SSv2 벤치에서만 성립하는 것 아니냐"는 반론 대비.
-
-- `external/PyCIL` 체크아웃(pin `f3509b8`) + **비-CUDA 패치 3종**을
-  `setup_pycil.sh` 한 번으로 재현 가능하게 자동화(MPS device, `.cuda()` → `self._device`,
-  전역 `cuda_shim`)
-- CIFAR-100 스모크(SimpleCIL, b0=50 inc=10): **6/6 태스크 완주**
-- ImageNet-100/1000 스캐폴드(데이터는 라이선스상 수동)
-
-**브리지 결과** — PyCIL의 **동일 스플릿**(클래스 순서를 PyCIL `DataManager`에서 직접
-import, 비트 단위 일치 검증) 위에서 우리 analytic head를 frozen CLIP feature로 실행:
-
-| head | Avg Inc Acc | Last Acc |
+| # | 작업 | 결과 |
 |---|---|---|
-| NCM prototype | 0.698 | 0.660 |
+| **1** | **UCF101 표준 벤치마크 진입** ⭐ | **FeCAM 88.84 — 공개 방법 중 2위**(ESSENTIAL만 위) |
+| **2** | **GRU+A-GEM과 직접 비교**(같은 벤치) | **+31.45%p 우위**, 학습은 1,600배 빠름 |
+| 3 | PyCIL 표준 벤치 구축 + CIFAR-100 브리지 | 서열(FeCAM>SLDA>NCM)이 다른 데이터셋에서 재현 |
+| 4 | TCD 반례 재검증(base-heavy) | 반전 없음, 격차 오히려 확대 |
+| 5 | SSv2-CIL 논문 4편 원문 정독 | 인용 필수 계보 확정, 우리 위치 규정 |
+| 6 | edge-CL 갭 감사(3편) | **주장을 축소함** — 정직성 확보 |
+| 7 | FLOPs 회계 + FeCAM 최적화 | 연산량 1,628배 적음 / 추론 248배 가속 |
+
+**그림 3장**: [`reports/figures/`](figures/) — 미팅에 그대로 사용 가능(200dpi PNG).
+
+**정정 2건 발생**(§정정). 테스트 68 → **70 passed**.
+
+---
+
+## 1. ⭐ UCF101 표준 벤치마크 — 우리 숫자를 남의 표에 올림
+
+**왜 중요한가:** 지금까지 우리 수치는 전부 48-class SSv2 **자체 subset**이라, 남의 논문과
+"서열"만 논할 수 있었고 숫자를 나란히 놓을 수 없었다. UCF101은 우리가 원문을 읽은
+4편(TCD·STSP·CSTA·ESSENTIAL)이 **전부 같은 프로토콜로 보고**하는 벤치마크다.
+
+### 프로토콜이 문자 그대로 일치함 (추정 아님, 검증함)
+
+TCD 공개 저장소에서 확인:
+- `class_list.pkl`이 `np.random.RandomState(1000).permutation(101)`과 **101개 전부 일치**
+  → 우리가 쓴 클래스 순서 = **TCD가 실제로 쓴 순서**
+- `ucf101_51_10.sh`가 `--init_task 51 --nb_class 10 --K 5 --budget_type class` 확인
+  → base 51, 증분 10, **exemplar 클래스당 5개**
+
+### 결과 (UCF101, 10×5 stages)
+
+| 방법 | 백본 | exemplar | 정확도 |
+|---|---|---|---|
+| TCD (ICCV'21) | ResNet-34+TSM | ✔ | 74.89 |
+| FrameMaker (NeurIPS'22) | TSM | ✔ | 78.13 |
+| STSP (ECCV'24) | TSM | 0 | 81.15 |
+| ST-prompt | CLIP | ✕ | 84.8 |
+| **우리 (frozen CLIP + FeCAM)** | **frozen CLIP** | **0** | **88.84** |
+| ESSENTIAL (ICCV'25 Highlight) | frozen CLIP | sparse+prompt | 95.1 |
+
+**ESSENTIAL 다음 2위.** TCD(+14.0) · FrameMaker(+10.7) · STSP(+7.7) · ST-prompt(+4.0)를
+모두 상회 — **backprop 0회, exemplar 0개, 백본 학습 0회, fit 0.3초**로.
+
+> 📊 그림: `figures/ucf101_tcd_curves.png`
+
+---
+
+## 2. ⭐ 우리 자체 baseline(GRU+A-GEM)과의 직접 비교
+
+같은 프로토콜, 같은 클래스 순서, exemplar는 TCD와 동일하게 **클래스당 5개**.
+
+| 세션 | 0 (51cls) | 1 (61) | 2 (71) | 3 (81) | 4 (91) | 5 (101) |
+|---|---|---|---|---|---|---|
+| GRU + A-GEM | 84.6 | **60.1** | 49.0 | 49.3 | 49.0 | 52.3 |
+| **FeCAM** | 90.1 | **90.1** | 88.9 | 88.5 | 88.1 | 87.4 |
+
+| | avg inc | last | 학습시간 |
+|---|---|---|---|
+| GRU + A-GEM | 57.39±0.16 | 52.30 | 480 s/seed |
+| **FeCAM** | **88.84±0.52** | **87.44** | **0.3 s** |
+| 차이 | **+31.45 %p** | **+35.14 %p** | **1,600배** |
+
+**문제는 표현력이 아니라 망각이다.** GRU는 base 51클래스를 84.6%로 잘 배운다(FeCAM과
+5.6%p 차이). 그런데 **첫 증분에서 −24.5%p 붕괴**하고 50% 근처에 정체한다. FeCAM은
+같은 지점에서 **−0.08%p**다.
+
+> **정직하게 병기:** 우리 GRU+A-GEM 57.39는 위 표의 **모든 공개 방법보다 낮다**
+> (최하위 iCaRL 70.6). 당연하다 — 저들은 비디오 CIL 전용 설계, 우리는 단순 GRU+A-GEM.
+> 주장은 "우리 baseline이 강하다"가 아니라 **"같은 frozen feature 위에서 backprop을
+> 없애는 쪽이 훨씬 낫다"**이며, 이 비교가 그걸 보여준다.
+
+---
+
+## 3. PyCIL 표준 벤치마크 구축 + CIFAR-100 브리지
+
+- `external/PyCIL`(pin `f3509b8`) + **비-CUDA 패치**를 `setup_pycil.sh` 한 번으로 재현
+- **브리지**: PyCIL의 **동일 스플릿**(클래스 순서를 `DataManager`에서 직접 import,
+  비트 단위 일치) 위에서 우리 head 실행
+
+| head | Avg Inc Acc | Last |
+|---|---|---|
+| NCM | 0.698 | 0.660 |
 | Deep SLDA | 0.725 | 0.686 |
-| **FeCAM (shared cov)** | **0.769** | **0.733** |
+| **FeCAM** | **0.769** | **0.733** |
 
-**핵심:** 서열 **FeCAM > SLDA > NCM**이 우리 SSv2 결과(0.157 > 0.141 > 0.124)와 **완전히
-일치** → 자체 벤치 특유 현상이 아님을 교차 검증.
+서열 **FeCAM > SLDA > NCM**이 SSv2 결과와 완전히 일치 → 자체 벤치 특유 현상이 아님.
 
-**주의(논문에 명기):** 우리는 frozen 사전학습 CLIP = **PTM 트랙**, PyCIL 고전(iCaRL/DER)은
-**from-scratch 트랙**. 한 표에서 우열 비교 금지, 트랙 라벨 병기 필수.
+**곁다리 수확:** PyCIL 자체 실행이 **마지막에 크래시**하는 상류 버그를 발견·수정했다
+(정확도 행렬을 `[task+1, task+1]`로 잡는데 `init_cls != increment`면 그룹 수와 태스크 수가
+달라짐 — 우리 b0=50/inc=10은 6태스크 × 10그룹). 결과값 자체엔 영향 없었지만 터미널에서
+돌리면 에러를 보게 되므로 `setup_pycil.sh`에 패치로 넣었다.
 
----
-
-## 2. TCD 반례 재검증 실험 (07-24)
-
-**문제:** TCD(ICCV'21)가 **SSv2에서 NME(우리 FeCAM과 같은 정신)가 CNN보다 못하다**고 보고
-— 우리 핵심 결론과 정면 충돌 가능.
-
-원본 174-class split은 영상 접근이 막혀 재현 불가 → **구조적 변수(base-heaviness)를
-우리 48클래스에 이식**해 true class-IL로 재평가:
-
-| split | 구성 | FeCAM last | GRU+A-GEM last | Δ |
-|---|---|---|---|---|
-| 균등(기존) | 6×8 | 0.157 | 0.105 | +0.052 |
-| moderate | 24 + 6×4 (4배) | 0.157 | 0.109 | +0.048 |
-| aggressive | 36 + 6×2 (6배) | 0.157 | **0.084** | **+0.073** |
-
-**반전이 일어나지 않았고 오히려 격차가 벌어짐.**
-
-**부수 발견 (별개 가치):** GRU+A-GEM이 base 세션 직후 **−65% 급락**(aggressive).
-원인은 A-GEM의 replay 메모리가 **stage당 고정 50개**라, base 클래스가 많을수록 클래스당
-exemplar가 급감(8.33 → **1.39개/class**)하기 때문. FeCAM 우위와 무관한 **우리 A-GEM
-구현 자체의 개선 포인트**.
+> 📊 그림: `figures/cifar100_bridge.png`
 
 ---
 
-## 3. SSv2-CIL 논문 4편 원문 정독 (07-24 ~ 07-25)
+## 4. TCD 반례 재검증 (base-heavy)
 
-검색 요약이 아니라 **PDF 원문을 직접 읽어** 확정. 결과: **"SSv2로 CIL 하는 게 새롭다"는
-주장은 틀림** — TCD가 이 벤치마크의 원조이고 Related Work에 반드시 인용해야 함.
+TCD가 **SSv2에서 NME(우리 FeCAM과 같은 정신)가 CNN보다 못하다**고 보고 → 우리 결론과
+정면 충돌 가능. 우리 48클래스를 TCD 스타일 base-heavy로 재편해 검증:
 
-| 논문 | 발표 | exemplar | 백본 | SSv2 (10×9 / 5×18) |
-|---|---|---|---|---|
-| **TCD** | ICCV 2021 | 20/class | ResNet-50+TSM, SSv2로 fine-tune | CNN **35.78/29.60**, NME 28.88/21.63 |
-| **STSP** | ECCV 2024 | **0** | ResNet-50+TSM + null-space gradient 투영 | **69.68/70.87** (최고) |
-| **CSTA** | TCSVT 투고'25 | 0*/5 | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26 |
-| **ESSENTIAL** | ICCV 2025 Highlight | sparse + prompt | **frozen CLIP** + temporal encoder | 48.9/47.5 (메모리 8.4 MiB) |
+| split | FeCAM last | GRU+A-GEM last | Δ |
+|---|---|---|---|
+| 균등(기존) | 0.157 | 0.105 | +0.052 |
+| moderate(4배) | 0.157 | 0.109 | +0.048 |
+| aggressive(6배) | 0.157 | **0.084** | **+0.073** |
 
-**확정된 사실 2가지:**
-
-1. **TCD의 NME 열세 원인이 원문으로 확정** — 백본이 ImageNet에서 시작해 **CIL 내내 SSv2로
-   계속 fine-tune**되므로, NME가 계산되는 feature 자체가 **학습되어 모션 정보를 담은**
-   feature다. 그걸 프레임 평균내면 정보가 파괴된다. 우리는 **한 번도 SSv2로 학습되지 않은
-   frozen CLIP**이라 애초에 평균내 잃을 시간 정보가 없다 → **경고가 구조적으로 덜 적용됨.**
-2. **TCD·STSP·CSTA 셋 다 백본을 SSv2로 학습**한다(ESSENTIAL만 예외로 frozen CLIP 사용).
-   즉 이 계보 전체와 우리를 가르는 축이 일관되게 성립.
-
-**검증 태도:** STSP의 69.68은 TCD 대비 거의 2배라 이례적 → **제3의 독립 소스**(ESSENTIAL
-Table 2가 69.7/70.9로 인용)로 교차 확인 후 채택. CSTA의 "exemplar-free"는 fine-tuning
-단계에서 클래스당 5샘플을 쓴다고 원문에 명시돼 있어 caveat으로 기록.
+**반전 없음, 격차 확대.** 부수 발견: A-GEM이 base 직후 −65% 붕괴 — replay 메모리가
+stage당 고정 50개라 클래스당 exemplar가 8.33→1.39개로 급감하기 때문(우리 구현의 개선점).
 
 ---
 
-## 4. edge-CL 갭 감사 — 주장을 축소함 (07-25)
+## 5. SSv2-CIL 논문 4편 원문 정독
+
+검색 요약이 아니라 **PDF 원문**으로 확인. **"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림** —
+TCD가 원조이고 Related Work에 반드시 인용해야 함.
+
+**확정된 사실:** TCD·STSP·CSTA는 **셋 다 백본을 SSv2로 학습**한다(ESSENTIAL만 frozen CLIP).
+그래서 그들의 feature엔 모션 정보가 들어있고, 프레임 평균이 그걸 파괴한다.
+**우리는 한 번도 SSv2로 학습되지 않은 frozen CLIP**이라 애초에 평균내 잃을 시간 정보가 없다
+→ TCD의 경고가 구조적으로 덜 적용됨.
+
+---
+
+## 6. edge-CL 갭 감사 — **주장을 축소함**
 
 우리 edge 프레이밍이 이미 다뤄진 주제인지 선행연구 3편으로 확인.
 
-**(a) 표준 서베이** (Zhou et al., TPAMI'24 — PyCIL 저자 그룹, 38쪽 전문 키워드 전수조사):
+- **표준 서베이**(Zhou et al., TPAMI'24, PyCIL 저자 그룹): edge 배포를 동기로 내걸지만
+  **38쪽에 "CPU" 0회**, FLOPs 0, 전력 0. 유일한 시간 측정도 3090 GPU.
+- **그러나 SparCL(NeurIPS'22)이 갤럭시 S20 CPU에서 학습 가속을 실측**(3.1×) →
+  ❌ "edge/CPU CL 측정이 없다"는 **못 씀**.
+- **BudgetCL(CVPR'23)**: 연산 예산 고정 CL을 대규모로. 단 예산을 iteration 수로 정의해
+  **하드웨어를 의도적으로 추상화**.
 
-| 키워드 | 등장 |
-|---|---|
-| **CPU** | **0회** |
-| FLOPs / 전력 | **0회** |
-| edge (실제 의미) | 8회 (74회 중 66회는 "knowl**edge**") |
-| budget | 81회 ← 실제 알맹이 |
-
-→ edge를 **메모리 바이트 문제로만** 다루고, 유일한 시간 측정도 **3090 GPU**. 연산 축은
-스스로 "미래 과제"로 넘김.
-
-**(b) 그러나 서베이가 지목한 선행연구 2편이 갭을 부분적으로 닫음:**
-
-- **SparCL (NeurIPS'22)** — **갤럭시 S20 / Snapdragon 865 CPU에서 학습 가속 실측**
-  (3.1×/2.3×, DER++ 대비 23× 적은 training FLOPs). 단 **backprop을 없애는 게 아니라
-  희소화**하고, ResNet-18을 from scratch로, **이미지**(CIFAR/Tiny-ImageNet)에서.
-- **BudgetCL (CVPR'23)** — 연산 예산 고정 CL을 대규모로(A100, 1500 GPU-hours). 단 예산을
-  **iteration 수로 정의해 하드웨어를 의도적으로 추상화**.
-
-### ⚠️ 결론: 쓸 수 있는 문장이 바뀜
+### 살아남는 주장 (= 우리 기여)
 
 | 주장 | 판정 |
 |---|---|
-| "edge/CPU CL 학습 비용을 측정한 연구가 없다" | ❌ **못 씀** (SparCL이 반박) |
-| "**비디오** CIL에 CPU·지연·전력 측정이 없다" | ✅ 사실 (TCD 계보 4편 전부 미측정) |
+| "edge/CPU CL 측정이 없다" | ❌ 못 씀 |
+| "**비디오** CIL에 CPU·지연·전력 측정이 없다" | ✅ 사실 (4편 전부 미측정) |
 | "backprop을 **제거**한 edge CL 비교가 없다" | ✅ 사실 (SparCL은 희소화) |
-| "절대 CPU wall-clock을 보고한 연구가 없다" | ✅ 사실 (셋 다 상대 배수 또는 추상 지표) |
+| "절대 CPU wall-clock을 보고한 연구가 없다" | ✅ 사실 |
 
-→ **우리 기여 = "비디오 × backprop-free × 절대 CPU 시간"의 교집합.** 재료는 각각
-선행연구가 있으나 이 조합은 비어 있음.
+→ **"비디오 × backprop-free × 절대 CPU 시간"의 교집합.**
 
-**보너스 — 우리 결론의 독립 뒷받침:** BudgetCL이 대규모 이미지 실험에서 내린 결론이
-우리 발견과 같은 방향이다: ① 연산 제약 시 **어떤 CL 알고리즘도 Naive를 못 이김**,
+**보너스:** BudgetCL의 결론이 우리와 같은 방향 — ① 연산 제약 시 어떤 CL도 Naive를 못 이김,
 ② 제약이 심할수록 격차 확대, ③ **frozen 사전학습 + 최소 학습이 갭을 메움**.
 
 ---
 
-## 5. FLOPs 회계 — 학습 + 추론 (07-26)
+## 7. FLOPs 회계 + FeCAM 최적화
 
-**동기:** 지금까지 효율 주장이 wall-clock뿐이라 하드웨어·구현에 의존 → edge-CL 문헌
-옆에 놓을 수 없음. SparCL·BudgetCL 모두 FLOPs를 쓰므로 같은 단위로 표현.
+wall-clock은 하드웨어·구현 의존이라 문헌 옆에 못 놓는다. SparCL·BudgetCL이 쓰는
+**FLOPs**로 같은 단위를 맞췄다(1 MAC = 2 FLOPs, train = 3×forward).
 
-**규약 명시:** 1 MAC = 2 FLOPs, training = forward + backward(=3×forward).
-analytic head는 `nn.Module`이 아니라 numpy 통계라 어떤 프로파일러로도 추적 불가 →
-전부 손으로 유도. **GRU 파라미터 수(603,696)를 실제 모델과 `assert`로 대조**해 검증.
-
-| 방법 | training FLOPs | vs GRU | 추론/윈도우 |
+| | training FLOPs | vs GRU | 추론/윈도우 |
 |---|---|---|---|
 | GRU + A-GEM | 4.64 T | 1× | 18.9 M |
 | **FeCAM** | **2.85 G** | **1,628×** | **636 K** |
-| NCM prototype | 44 M | 104,791× | 59 K |
 
-**세부 발견:**
+**FeCAM 채점 최적화(적용·배포 완료):** Mahalanobis 이차형식을 전개하고 평균 의존 항을
+캐시 → **윈도우당 14.4 ms → 0.058 ms (248배)**, FLOPs 40배 감소, **출력은 완전 동일**
+(최대 상대오차 6e-15, argmax 100% 일치). 회귀 테스트 2개 추가, HF Space 재배포 검증.
 
-- **A-GEM 자체 오버헤드는 전체의 11.8%뿐** — GRU가 비싼 건 A-GEM이 아니라 **backprop과
-  15 epoch 반복** 때문.
-- **FLOPs와 wall-clock은 다른 걸 잡아낸다** — Deep SLDA는 FeCAM보다 FLOPs가 2.3배인데
-  wall-clock은 **44배**(per-sample 스트리밍 구현이라 BLAS 배칭 없음). **둘 다 보고해야 함.**
-- **인코더가 모든 걸 압도** — frozen CLIP은 윈도우당 **141 GFLOPs**, 학습셋 전체 677 TFLOPs로
-  **GRU+A-GEM 전체 학습의 146배**. 추론에선 **99.98% 이상**을 차지.
-  → head 선택은 **정확도로** 하면 되고, 실시간 성능은 **인코더를 건드려야** 개선됨
-  (MobileCLIP 시도가 CPU에서 실패한 건 별개 문제).
+**인코더가 지배한다:** frozen CLIP이 윈도우당 141 GFLOPs로 **학습 전체의 146배**,
+추론의 **99.98%**. → head는 정확도로 고르면 되고, **실시간 성능은 인코더를 건드려야** 개선됨.
 
 ---
 
-## 6. FeCAM 채점 최적화 + 재배포 (07-26)
+## 발견 — 증분 크기에 완전히 불변 (구조적 성질)
 
-`scores()`가 클래스별로 Python 루프를 돌며 `einsum`을 n=1로 호출 → K·D² FLOPs.
-Mahalanobis 이차형식을 전개하면 `(x−m)'P(x−m) = x'Px − x'Pm − m'Px + m'Pm`이고
-**m에만 의존하는 항은 캐시 가능** → 윈도우당 **D² + 2KD**로 하락.
+| 방법 | 10×5 → 2×25 변화 |
+|---|---|
+| TCD | −2.70 |
+| FrameMaker | −2.36 |
+| STSP | −1.90 |
+| ESSENTIAL | −1.80 |
+| **우리 (FeCAM)** | **0.00** |
 
-| | 이전 | 현재 | 배수 |
-|---|---|---|---|
-| `predict_window` (데모 실시간) | 14.4 ms | **0.058 ms** | **248배** |
-| 배치 채점 4,702개 | ~8,200 ms | **67 ms** | **122배** |
-| FLOPs/윈도우 | 25.3 M | **636 K** | **40배** |
+클래스별 통계가 **독립 누적**이라 세션 경계가 무의미하다. **edge 서사에 직결** —
+스마트글래스에서 **한 번에 한 클래스씩** 등록해도 페널티가 없다.
 
-**출력 불변:** 이전 구현 대비 최대 상대오차 **6e-15**, **argmax 100% 일치**, 정확도 4개
-지표 모두 마지막 자리까지 동일(task-aware 0.410 / full-48 0.157 / F1 0.144 / mAP 0.120).
+> 📊 그림: `figures/increment_sensitivity.png`
 
-교차항 2개를 `2x'Pm`으로 합치지 않고 각각 유지해, P가 완벽히 대칭이 아니어도 정확하도록 함.
-회귀 테스트 2개 추가(교과서적 per-class 계산과 직접 대조 + 신규 등록 시 캐시 무효화).
+---
 
-**배포:** HF Space 반영(`81a0409..fafcb0d`), `/health`·`/predict_rt`로 3-way 응답 확인.
+## 발견 — SSv2와 UCF101의 대비가 적용 범위를 규정한다
 
-**부수 결과:** 이 최적화로 **FeCAM 추론이 GRU보다 30배 싸짐**(636 K vs 18.9 M).
-최적화 전엔 오히려 1.33배 비쌌으므로, "analytic head는 학습에서만 유리"라는 중간 결론이
-**"학습·추론 양쪽 모두 유리"로 뒤집힘**.
+| 벤치마크 | 성격 | 우리 FeCAM |
+|---|---|---|
+| **UCF101** | **static-biased** (appearance로 구별) | **88.84** |
+| SSv2 subset | **temporal-biased** (모션으로만 구별) | 15.7 |
+
+"static/temporal-biased"는 **ESSENTIAL 논문이 자기 §4.1에서 쓰는 용어**다.
+즉 **우리 방법의 성패가 데이터셋 성격으로 정확히 예측된다.** 약점 고백이 아니라
+**적용 조건의 명시**이고, TCD의 SSv2 NME 열세 보고와도 완전히 일관된다.
+
+논문 문장: *"appearance-discriminative한 행동에 대해서는 학습 없는 통계 head가
+무거운 학습 방법을 능가하며, motion-discriminative한 경우에는 그렇지 않다.
+우리는 그 경계를 정량화한다."*
 
 ---
 
 ## ⚠️ 정정 사항 (이전 보고 수치 수정)
 
-정직성을 위해 명시. **정확도 수치는 전부 영향 없음.**
+**정확도 수치는 전부 영향 없음.**
 
-### (1) 학습 시간이 잘못 귀속돼 있었음
-
-러너 타이머(`dev/run_modern_cpu_methods.py:186-194`)가 stage 1의 `model.scores(Xva)`
-**평가 호출을 타이머 안에 포함**하고 있었음.
+**(1) 학습 시간이 잘못 귀속돼 있었음** — 러너 타이머 안에 평가 호출이 포함돼 있었다.
 
 | | 기존 보고 | 실제 fit only | 평가 비중 |
 |---|---|---|---|
 | **FeCAM** | 8.7 s | **42.4 ms** | **99.5%** |
 | Deep SLDA | 2.1 s | 1.86 s | 11% |
-| RanDumb | 0.9 s | 532 ms | 41% |
 
-→ "FeCAM이 GRU보다 30배 빠름"은 **과소평가**였고, fit-only 기준 **약 6,400배**.
-관련 리포트 전부 정정 완료.
+→ "FeCAM이 30배 빠름"은 **과소평가**였고 fit-only 기준 **약 6,400배**.
 
-### (2) 내 이전 분석의 오독 정정
+**(2) 내 이전 분석의 오독** — "ESSENTIAL이 TCD를 원문과 다르게 인용한다"고 문제 제기했으나,
+Table 2를 전부 읽어보니 `TCD(ViT)`(공정 재실행)와 `TCD(TSM)`(원문 일치) **두 행이 다 있었다**.
+투명하게 병기한 것이었고, 교훈을 "제3자 인용 불신" → **"표의 백본 열까지 확인"**으로 수정.
 
-07-25에 "ESSENTIAL이 TCD 수치를 원문과 다르게 인용한다"고 문제 제기했으나, **Table 2를
-전부 읽어보니 오해**였음 — 그 표엔 `TCD(ViT)` 행(공정 재실행)과 `TCD(TSM)` 행(원문과
-정확히 일치)이 **둘 다** 있었음. ESSENTIAL은 투명하게 병기한 것. 교훈을
-"제3자 인용을 불신하라" → **"표를 볼 땐 백본 열까지 확인하라"**로 수정.
+---
+
+## 정직한 caveat (논문에 병기할 것)
+
+1. **트랙이 다르다** — 우리는 백본을 전혀 학습하지 않는다. 위 표는 위치 파악용이지
+   동일 조건 순위가 아니다.
+2. **CLIP 사전학습 오염 가능성** — UCF101은 YouTube 기반, CLIP은 웹 스케일 학습.
+   PTM 트랙 공통 caveat.
+3. **ESSENTIAL도 같은 frozen CLIP으로 95.1** — 6.3%p 격차는 백본이 아니라 그들의
+   **학습형 temporal encoder + memory retrieval**에서 온다. 개선 여지가 그만큼 있다는 뜻.
+4. GRU 비교는 10×5 열만 수행(seed당 480초). 증분을 줄이면 GRU가 더 불리해지므로
+   **보수적인 선택**이다.
+5. **HMDB51 보류** — 영상은 구할 수 있으나 **공식 split을 구할 수 없음**(serre-lab URL이
+   HTML만 반환, HF 미러는 영상만, TCD 저장소에도 없음). 자체 분할은 비교 가능성이라는
+   목적 자체를 없애므로 중단.
+
+---
+
+## 다음 단계 (우선순위)
+
+1. **실제 임베디드 보드 실측**(Jetson Orin Nano / 라즈베리파이) — 지금은 맥북 CPU.
+   "edge"를 주장하는데 측정이 노트북인 게 가장 큰 취약점.
+2. **iteration-budget 프로토콜 병기**(BudgetCL 방식) — 그들 대규모 결과와 직접 비교 가능.
+3. **AUC-A/AUC-L 지표 채택**(서베이 방식) + **연산 축 추가** ← 우리 차별점.
+4. **HMDB51** — split 확보 시 즉시 재개(파이프라인은 UCF101 것 재사용).
+5. few-shot enrollment 정량화 — 교수님 체크리스트에서 유일하게 남은 항목.
 
 ---
 
 ## 산출물
 
-**신규 파일 (16개)**
+**신규 스크립트**: `benchmarks/pycil/`(9), `scripts/get_ucf101.sh`,
+`scripts/extract_ucf101_features.py`, `dev/run_base_heavy_split.py`,
+`dev/run_ucf101_tcd_protocol.py`, `dev/run_ucf101_gru_agem.py`,
+`dev/compute_flops.py`, `dev/plot_cil_results.py`
 
-| 경로 | 내용 |
-|---|---|
-| `benchmarks/pycil/` (9파일) | PyCIL 셋업·패치·config·브리지 스크립트 |
-| `dev/run_base_heavy_split.py` | TCD 스타일 base-heavy 재검증 실험 |
-| `dev/compute_flops.py` | 학습·추론 FLOPs 회계 |
-| `reports/pycil_bridge_result.md` | CIFAR-100 교차검증 결과 |
-| `reports/base_heavy_split_result.md` | TCD 반례 재검증 결과 |
-| `reports/pycil_survey_edge_gap.md` | edge-CL 선행연구 3편 감사 |
-| `reports/flops_result.md` | FLOPs 회계 + 발견 6가지 |
-| `reports/base_heavy_split_raw.json` | seed별 원시 결과 |
+**신규 리포트**: `ucf101_tcd_result.md` · `base_heavy_split_result.md` ·
+`pycil_bridge_result.md` · `pycil_survey_edge_gap.md` · `flops_result.md` ·
+`meeting_script_0726.md` · 본 문서
 
-**수정 파일:** `src/models/fecam_head.py`(최적화), `tests/test_fecam_head.py`(회귀 테스트 2개),
-`reports/sota_positioning_brief.md`(§1(f) 문헌 지형 + Q11 신설 + §4 갱신),
-`reports/cpu_friendly_methods_result.md`·`reports/meeting_prep_todo_status.md`(수치 정정),
-`docs/project_focus.md`(갭 목록 갱신)
+**그림**: `figures/ucf101_tcd_curves.png` · `figures/cifar100_bridge.png` ·
+`figures/increment_sensitivity.png`
 
-**커밋 12개**
-
-```text
-2026-07-22  ea6cb29  feat: PyCIL benchmark setup (CIFAR-100 + ImageNet) + analytic-head bridge
-2026-07-24  f5d4c39  study: TCD base-heavy split re-validation — FeCAM lead holds, widens
-2026-07-24  aaa5374  docs: refresh commit-history block with actual base-heavy-split hash
-2026-07-24  a92cdd2  docs: verify TCD (ICCV'21) primary source, upgrade hypothesis to confirmed fact
-2026-07-25  2cffe81  docs: verify CSTA and STSP primary sources, build SSv2-CIL landscape table
-2026-07-25  285dc5e  docs: cross-verify STSP SSv2 numbers via ESSENTIAL, flag cross-paper TCD discrepancy
-2026-07-25  0986f02  docs: verify ESSENTIAL primary source, correct prior TCD-citation misreading
-2026-07-25  1b2383a  docs: audit PyCIL-group survey for CPU/resource-constrained coverage
-2026-07-25  a0693d2  docs: read SparCL + BudgetCL primary sources, narrow the edge-CL gap claim
-2026-07-26  c59730b  feat: report training FLOPs alongside wall-clock; fix misattributed train times
-2026-07-26  fa858c1  feat: add inference FLOPs under the same convention; rename to compute_flops
-2026-07-26  6aa3c3a  perf: vectorize FeCAM scoring -- 40x fewer FLOPs, 248x faster, identical output
-```
-
-PR: [#2](https://github.com/STkangyh/coad-mini/pull/2) (브랜치 `feature/pycil-benchmarks`)
-
----
-
-## 다음 단계 (미착수, 우선순위 순)
-
-1. **실제 embedded 하드웨어 실측** — 현재는 Mac CPU. Jetson Orin Nano / Raspberry Pi급에서
-   학습·추론 시간과 전력을 재면 논문 설득력이 크게 오름. (갭 목록 1번)
-2. **iteration-budget 프로토콜 병기**(BudgetCL 방식) — "step당 N iteration" 형식을 추가하면
-   그들 대규모 결과와 직접 비교 가능. (갭 9번)
-3. **AUC-A / AUC-L 지표 채택**(서베이 방식) — 예산별 성능 곡선의 면적. `benchmarks/pycil/`에
-   동일 스플릿이 이미 있어 적용 비용 낮음. **여기에 연산 축을 추가하는 게 우리 차별점.** (갭 7번)
-4. **원본 SSv2 영상 확보** — 막히면 TCD 174-class 원본 재현과 MobileCLIP 다운스트림 정확도
-   비교가 계속 불가.
-5. SLDA/Ridge/RanDumb에 precision 캐시 추가 — 데모 투입 시 선결 조건(현재 데모는 FeCAM만 사용).
+PR: [#2](https://github.com/STkangyh/coad-mini/pull/2) (`feature/pycil-benchmarks`)
