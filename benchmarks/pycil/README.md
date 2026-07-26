@@ -67,6 +67,15 @@ and record which one in the paper.
 - PyCIL supports CPU natively via `"device": [-1]`; our patch adds `"device": ["mps"]`.
 - Many PyCIL internals hardcode `.cuda()` — `cuda_shim.py` redirects those to
   MPS/CPU globally. No effect on CUDA machines.
+- **Upstream bug we patch (not Mac-specific).** PyCIL's end-of-run accuracy matrix
+  allocates `[task+1, task+1]`, assuming the number of class groups equals the
+  number of tasks. That only holds when `init_cls == increment`. With our
+  `b0=50 inc=10` config there are **6 tasks but 10 class groups**, so the run dies
+  with `could not broadcast input array from shape (7,) into shape (6,)` —
+  *after* training and evaluation have finished and the top1/top5 curves and
+  Average Accuracy have already printed. `setup_pycil.sh` sizes the table by the
+  real group count instead, so the forgetting matrix prints too. Reduces to the
+  original behaviour when `init_cls == increment`.
 - Classic baselines (iCaRL/DER/FOSTER: 160–200 epochs of ResNet training per run)
   are **impractical on this laptop**; run them on a CUDA box with the same configs.
   The smoke config proves the pipeline; our analytic heads run in seconds anywhere.
