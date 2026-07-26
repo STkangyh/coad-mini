@@ -50,10 +50,10 @@ sys.path.insert(0, str(ROOT))
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
 
-FEAT = ROOT / "data/features_ucf101_b32"
+FEAT = ROOT / "data/features_ucf101_b32"     # overridable via --features
 N_CLASSES = 101
 BASE = 51                      # TCD's initial stage for UCF101
-DIM = 512
+DIM = 512                                    # set from the manifest at run time
 SEEDS = [1000, 1993, 2021]     # TCD's own class-order seeds
 INCREMENTS = [10, 5, 2]
 
@@ -161,10 +161,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--inc", type=int, nargs="+", default=INCREMENTS)
     ap.add_argument("--seeds", type=int, nargs="+", default=SEEDS)
+    ap.add_argument("--features", type=Path, default=None,
+                    help="feature dir (default: CLIP B/32); use to compare encoders")
+    ap.add_argument("--tag", default=None, help="label for the raw-results file")
     args = ap.parse_args()
+
+    global FEAT, DIM
+    if args.features:
+        FEAT = args.features if args.features.is_absolute() else ROOT / args.features
 
     Xtr, ytr = load_split("train")
     Xte, yte = load_split("test")
+    DIM = Xtr.shape[1]                       # encoders differ in width
     print(f"UCF101 official split 1 — train {Xtr.shape}, test {Xte.shape}, "
           f"{len(np.unique(ytr))} classes")
     print(f"TCD protocol: {BASE}-class base + increments of {args.inc}, "
@@ -195,7 +203,8 @@ def main():
             }
         print()
 
-    out = ROOT / "reports/ucf101_tcd_raw.json"
+    tag = args.tag or ("" if not args.features else "_" + FEAT.name.replace("features_ucf101_", ""))
+    out = ROOT / f"reports/ucf101_tcd_raw{tag}.json"
     out.write_text(json.dumps(results, indent=2))
     print(f"raw -> {out}")
 

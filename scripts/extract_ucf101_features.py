@@ -36,13 +36,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.extract_clip_features import extract, sample_frames  # noqa: E402
+from scripts.extract_clip_features import (  # noqa: E402
+    BACKBONES, extract, sample_frames,
+)
 
 UCF_DIR = ROOT / "data/ucf101"
 VIDEO_DIR = UCF_DIR / "UCF-101"
 LIST_DIR = UCF_DIR / "ucfTrainTestlist"
-OUT_DIR = ROOT / "data/features_ucf101_b32"
-MODEL_NAME = "openai/clip-vit-base-patch32"
+OUT_TEMPLATE = "data/features_ucf101_{key}"
 N_FRAMES = 16
 
 
@@ -79,6 +80,8 @@ def load_split(split: str, class_index: dict[str, int]) -> list[dict]:
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--backbone", choices=BACKBONES, default="clip_b32",
+                    help="vision encoder; each writes its own feature dir")
     ap.add_argument("--split", nargs="+", default=["train", "test"])
     ap.add_argument("--num-frames", type=int, default=N_FRAMES)
     ap.add_argument("--limit", type=int, default=None, help="smoke-test only")
@@ -88,20 +91,26 @@ def main():
     if not VIDEO_DIR.exists():
         raise SystemExit(f"missing {VIDEO_DIR} — run scripts/get_ucf101.sh --extract")
 
+    cfg = BACKBONES[args.backbone]
+    key = "b32" if args.backbone == "clip_b32" else args.backbone
+    out_dir = ROOT / OUT_TEMPLATE.format(key=key)
+
     device = "mps" if torch.backends.mps.is_available() else "cpu"
-    print(f"device: {device} | model: {MODEL_NAME} | frames/video: {args.num_frames}")
-    model = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
-    processor = AutoProcessor.from_pretrained(MODEL_NAME)
+    print(f"device: {device} | backbone: {args.backbone} ({cfg.model_name})")
+    print(f"frames/video: {args.num_frames} | out: {out_dir}")
+    model = AutoModel.from_pretrained(cfg.model_name).to(device).eval()
+    processor = AutoProcessor.from_pretrained(cfg.model_name)
 
     class_index = load_class_index()
-    manifest = {"model": MODEL_NAME, "num_frames": args.num_frames,
+    manifest = {"model": cfg.model_name, "backbone": args.backbone,
+                "num_frames": args.num_frames,
                 "n_classes": len(class_index), "splits": {}}
 
     for split in args.split:
         samples = load_split(split, class_index)
         if args.limit:
             samples = samples[:args.limit]
-        out = OUT_DIR / split
+        out = out_dir / split
         out.mkdir(parents=True, exist_ok=True)
 
         done = failed = 0
@@ -133,9 +142,9 @@ def main():
         print(f"[{split}] done={done} failed={failed} "
               f"({time.perf_counter()-t0:.0f}s)")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "manifest.json").write_text(json.dumps(manifest))
-    print(f"manifest -> {OUT_DIR/'manifest.json'}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "manifest.json").write_text(json.dumps(manifest))
+    print(f"manifest -> {out_dir/'manifest.json'}")
 
 
 if __name__ == "__main__":

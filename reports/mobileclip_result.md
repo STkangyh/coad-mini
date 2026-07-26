@@ -10,6 +10,11 @@ the edge-CL framing calls for testing a purpose-built lightweight encoder.
 - ✅ **Pipeline integration** — `scripts/extract_clip_features.py` now supports
   `--backbone mobileclip_s0`, ready to run.
 - ⛔ **Downstream classification accuracy (GRU/A-GEM/FeCAM on MobileCLIP features)** —
+  **RESOLVED (2026-07-27)** — the downstream accuracy comparison was blocked on raw
+  video access; UCF101's 13,320 videos unblocked it. MobileCLIP-S0 matches CLIP B/32
+  to within 0.21pp on UCF101 (88.63 vs 88.84 with FeCAM) while being 20x slower on
+  CPU -- see reports/encoder_swap_result.md. Original blocker note below.
+
   **blocked**: this session's environment has no access to the raw Something-Something V2
   `.webm` videos (`COAD_VIDEO_DIR` from `docs/`-referenced setup is unavailable here).
   The already-extracted CLIP B/32 `.npy` features remain in `data/features/` (unaffected),
