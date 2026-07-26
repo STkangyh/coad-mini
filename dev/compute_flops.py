@@ -179,15 +179,23 @@ def gru_infer_flops():
 
 
 def fecam_infer_flops(d=D, k=C):
-    """mean-pool + Tukey prep, then per-class Mahalanobis via einsum.
+    """mean-pool + Tukey prep, then the expanded Mahalanobis quadratic form.
 
-    Per class: (x-mu)/sd  then  v @ prec @ v  = d^2 + d MACs. The class loop is
-    what makes this the most expensive analytic head at inference.
+    scores() computes (x-m)'P(x-m) = x'Px - x'Pm - m'Px + m'Pm with the m-only
+    term cached, so the per-window cost is one (D,)x(D,D) matvec plus two
+    (D,)x(D,K) matvecs -- D^2 + 2KD MACs -- instead of the K*D^2 the old
+    per-class loop cost. See src/models/fecam_head.py::scores.
     """
     pool = T * d + d
     prep = d * 3 + 2 * d * MAC + d
-    per_class = 2 * d + (d * d + d) * MAC
-    return {"steady": pool + prep + k * per_class, "per_call": 0}
+    quad = d * d * MAC + d              # x'Px
+    cross = 2 * k * d * MAC             # x'Pm and m'Px
+    return {"steady": pool + prep + quad + cross + 3 * k, "per_call": 0}
+
+
+def fecam_infer_flops_loop(d=D, k=C):
+    """Pre-optimization cost, kept for the before/after comparison in the report."""
+    return (T * d + d) + (d * 3 + 2 * d * MAC + d) + k * (2 * d + (d * d + d) * MAC)
 
 
 def ncm_infer_flops(d=D, k=C):
@@ -322,6 +330,12 @@ def main():
     print("  every scores() call (a DxD / 2000x2000 inverse or solve). Harmless")
     print("  when scoring a big batch, dominant for single-window real-time use.")
     print("  FeCAM caches it; SLDA/Ridge/RanDumb do not -- see reports/flops_result.md.")
+
+    loop = fecam_infer_flops_loop()
+    now = fecam_infer_flops()["steady"]
+    print(f"\n  FeCAM scoring was optimized (per-class loop -> expanded quadratic form):")
+    print(f"    before {fmt(loop).strip()}  ->  after {fmt(now).strip()}   "
+          f"({loop / now:.0f}x fewer FLOPs, accuracy bit-identical)")
 
 
 if __name__ == "__main__":

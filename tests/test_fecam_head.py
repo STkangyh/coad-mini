@@ -103,3 +103,44 @@ def test_predict_window_accepts_1xTxD():
     w = RNG.standard_normal((1, 16, D))   # torch-style (1, T, D)
     top1, prob, s = h.predict_window(w)
     assert 0 <= top1 < 16 and s.shape == (16,)
+
+
+def test_scores_match_per_class_mahalanobis_reference():
+    """Vectorized scoring must equal the textbook per-class quadratic form.
+
+    scores() expands (x-m)'P(x-m) and caches the m-only term for speed; this
+    pins it to a direct, obviously-correct per-class computation so the
+    optimization can never silently drift.
+    """
+    X, y, _ = make_clusters(n_classes=5, n_per=30)
+    h = FeCAMHead(feature_dim=D, max_classes=8)
+    h.observe(X, y)
+
+    Xq = X[:12]
+    got = h.scores(Xq)
+
+    prec, sd, active, _, _, _ = h._precision()
+    Xp = h._prep(Xq)
+    want = np.full((len(Xq), h.max_classes), -1e18)
+    for c in active:
+        v = (Xp - h.means[c]) / sd
+        want[:, c] = -np.einsum("nd,de,ne->n", v, prec, v)
+
+    np.testing.assert_allclose(got[:, active], want[:, active], rtol=1e-9, atol=1e-9)
+    assert np.array_equal(got.argmax(axis=1), want.argmax(axis=1))
+
+
+def test_scores_cache_invalidated_by_new_enrollment():
+    """The cached mean-dependent terms must not survive a statistics update."""
+    X, y, _ = make_clusters(n_classes=3, n_per=30)
+    h = FeCAMHead(feature_dim=D, max_classes=8)
+    h.observe(X, y)
+    h.scores(X[:2])                       # warm the cache
+
+    newX = RNG.standard_normal((10, D))
+    h.observe(newX, np.full(10, 5))       # enroll an unseen class id
+    S = h.scores(newX)
+
+    assert h.n_classes == 4
+    assert np.all(S[:, 5] > -1e17), "newly enrolled class must be scorable"
+    assert S.argmax(axis=1).tolist() == [5] * 10
