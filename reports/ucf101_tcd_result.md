@@ -58,6 +58,38 @@ TCD 공개 저장소([bellos1203/TCD](https://github.com/bellos1203/TCD))에서 
 **→ ESSENTIAL 다음 2위.** TCD(+14.0), FrameMaker(+10.7), STSP(+7.7), ST-prompt(+4.0)를
 모두 상회한다. 그것도 **backprop 0회, exemplar 0개, 백본 학습 0회, fit 0.3초**로.
 
+## 우리 자체 baseline(GRU+A-GEM)과의 직접 비교
+
+스크립트: [`dev/run_ucf101_gru_agem.py`](../dev/run_ucf101_gru_agem.py) · 원시결과
+`reports/ucf101_gru_agem_raw.json`. 같은 프로토콜(10×5, 동일 클래스 순서 3개),
+15 epoch/세션, exemplar는 **TCD와 동일한 클래스당 5개**(저장소 스크립트에서 확인한 값).
+
+| 세션 | 0 (51cls) | 1 (61) | 2 (71) | 3 (81) | 4 (91) | 5 (101) |
+|---|---|---|---|---|---|---|
+| GRU + A-GEM | 84.6 | **60.1** | 49.0 | 49.3 | 49.0 | 52.3 |
+| **FeCAM** | 90.1 | **90.1** | 88.9 | 88.5 | 88.1 | 87.4 |
+
+| | avg inc acc | last | 학습시간/seed |
+|---|---|---|---|
+| GRU + A-GEM | 57.39±0.16 | 52.30 | **480 s** |
+| **FeCAM** | **88.84±0.52** | **87.44** | **0.3 s** |
+| 차이 | **+31.45 %p** | **+35.14 %p** | **1,600배 빠름** |
+
+**핵심은 base 세션이 아니라 그 직후다.** GRU+A-GEM은 base 51클래스를 84.6%로 잘 학습한다
+(FeCAM 90.1과 5.6%p 차이). 그런데 **첫 증분에서 −24.5%p(−29%) 붕괴**하고 이후 50% 근처에
+정체한다. FeCAM은 같은 지점에서 **−0.08%p**다.
+
+즉 이 벤치마크에서 GRU+A-GEM의 문제는 **표현력이 아니라 망각**임이 분명해졌다.
+`reports/base_heavy_split_result.md`에서 SSv2로 관찰한 "base가 클수록 A-GEM이 무너진다"는
+현상이, 51클래스 base라는 훨씬 극단적인 조건에서 그대로 재현된 것이다 —
+이번엔 exemplar 예산을 클래스당 5개로 **늘려줬는데도** 그렇다.
+
+> **정직하게 병기할 것:** 우리 GRU+A-GEM 57.39는 위 문헌 표의 **모든 방법보다 낮다**
+> (최하위 iCaRL 70.6). 당연한 결과다 — 저들은 비디오 CIL 전용으로 설계된 방법(distillation,
+> temporal 모듈 등)이고 우리 baseline은 단순 GRU + A-GEM이다. 우리 주장은
+> "우리 baseline이 강하다"가 아니라 **"같은 frozen feature 위에서 backprop을 없애는 쪽이
+> 훨씬 낫다"**이며, 이 비교는 그것을 보여준다.
+
 ## 발견 1 — 증분 크기에 완전히 불변 (구조적 성질)
 
 | 방법 | 10×5 → 2×25 변화 |
@@ -107,7 +139,9 @@ NCM·SLDA도 마찬가지(0.09%p, 0.04%p).
 3. **ESSENTIAL도 같은 frozen CLIP을 쓰고 95.1이다.** 즉 우리와의 6.3%p 격차는
    백본이 아니라 **그들의 학습형 temporal encoder + memory retrieval 모듈**에서 온다.
    "frozen CLIP이라서 잘 나왔다"로 퉁칠 수 없고, **동시에 개선 여지가 그만큼 있다는 뜻**이다.
-4. GRU+A-GEM은 아직 이 프로토콜에서 안 돌렸다 — 우리 자체 baseline과의 비교는 후속.
+4. GRU+A-GEM 비교는 **10×5 열에서만** 수행했다(5×10, 2×25는 미실행 — seed당 480초라
+   전 조합은 비용이 큼). 증분 크기를 줄이면 세션이 늘어 GRU 쪽이 더 불리해질 것으로
+   예상되므로, 10×5만 보고하는 것이 baseline에 유리한 쪽(보수적)이다.
 
 ## 재현
 
@@ -115,10 +149,11 @@ NCM·SLDA도 마찬가지(0.09%p, 0.04%p).
 ./scripts/get_ucf101.sh --extract                    # 6.5GB
 python3 scripts/extract_ucf101_features.py           # ~56분 (MPS)
 python3 dev/run_ucf101_tcd_protocol.py               # 초 단위
+python3 dev/run_ucf101_gru_agem.py                   # ~24분 (3 seed, CPU)
 ```
 
 ## 후속
 
-- **GRU+A-GEM을 같은 프로토콜로** — 우리 자체 baseline 대비 우위를 표준 벤치에서도 확인
-- **HMDB51** 추가(2GB, 같은 계보가 전부 보고) — TCD 프로토콜은 26 base + 5/25
+- ~~GRU+A-GEM을 같은 프로토콜로~~ — **완료**(위 절). 격차 +31.45%p.
+- **HMDB51 — 착수했으나 보류.** 영상은 구할 수 있으나 **공식 train/test split을 구할 수 없음**(serre-lab 공식 URL이 http/https 모두 HTML만 반환, HF 미러들은 영상만 포함, TCD 저장소에도 없음). 자체 분할을 만들면 "비교 가능한 숫자"라는 목적 자체가 사라지므로 중단. split 확보 시 재개.
 - FLOPs·wall-clock을 이 벤치마크 기준으로도 병기(`reports/flops_result.md` 규약 사용)
