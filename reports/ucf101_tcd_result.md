@@ -16,9 +16,21 @@ SSv2-CIL 계보 4편(TCD·STSP·CSTA·ESSENTIAL)이 **전부 같은 프로토콜
 | 특징 | frozen **CLIP ViT-B/32**, 16프레임 균등 샘플 → mean-pool → 512-d |
 | base | **51 클래스** |
 | 증분 | 나머지 50개를 **10 / 5 / 2**개씩 (= TCD 표기 10×5, 5×10, 2×25 stages) |
-| 클래스 순서 | 랜덤 셔플 **3개 평균** (TCD 자체 시드 1000 / 1993 / 2021) |
+| 클래스 순서 | **TCD의 실제 순서와 비트 단위 동일** (아래 검증) — 3개 평균 |
 | 지표 | average incremental accuracy (매 스텝 후 지금까지 본 전체 클래스 top-1, **task ID 없음**) |
 | exemplar | **0** (통계만 누적) |
+
+### 프로토콜 일치 검증 (추정이 아니라 확인함)
+
+TCD 공개 저장소([bellos1203/TCD](https://github.com/bellos1203/TCD))에서 두 가지를 확인했다:
+
+1. **클래스 순서** — 저장소의 `class_list.pkl`이 `np.random.RandomState(1000).permutation(101)`과
+   **101개 전부 일치**(불일치 0). 즉 우리 시드 기반 순서가 TCD가 실제로 쓴 순서와 같다.
+   "비슷하게 랜덤"이 아니라 **문자 그대로 같은 순서**다.
+2. **실행 설정** — `scripts/ucf101/ucf101_51_10.sh`가
+   `--seed 1000/1993/2021 --init_task 51 --nb_class 10 --K 5 --budget_type class
+   --store_frames uniform`을 사용. 우리가 맞춘 값과 전부 동일하며,
+   특히 **exemplar 예산이 "클래스당 5개"**임을 확인(아래 GRU 비교에 반영).
 
 ## 결과
 

@@ -11,6 +11,14 @@ Protocol (TCD, Park et al. ICCV'21, Sec 4.2 -- verified from the paper):
     10 / 5 / 2  -> the "10 x 5", "5 x 10", "2 x 25 stages" columns in their tables
   * class order shuffled randomly; results averaged over 3 orders
     (TCD's own seeds: 1000, 1993, 2021)
+
+    VERIFIED, not assumed: TCD ships the order it used as class_list.pkl, and
+    that file is element-for-element identical (101/101) to
+    np.random.RandomState(1000).permutation(101), i.e. exactly what this script
+    generates. Their scripts/ucf101/ucf101_51_10.sh confirms the rest --
+    --seed 1000/1993/2021, --init_task 51, --nb_class 10, --K 5
+    --budget_type class, --store_frames uniform. So these runs use TCD's
+    literal class orders, not merely similar random ones.
   * metric: average incremental accuracy -- mean of the accuracies measured
     after every incremental step, each over all classes seen so far (no task id)
 
