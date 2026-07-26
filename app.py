@@ -31,11 +31,14 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from src.models.gru_detector import GRUDetector
 from src.enroll.few_shot import expand_classifier, FewShotEnroller
 from src.anomaly.detector import AnomalyScorer
+from src.models.fecam_head import FeCAMHead
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
 CKPT_DIR    = Path("checkpoints")
 ENROLLED_CKPT   = CKPT_DIR / "agem_enrolled.pt"       # few-shot 으로 확장된 모델 (persist)
 ENROLLED_LABELS = CKPT_DIR / "class_labels_enrolled.json"
+FECAM_CKPT          = CKPT_DIR / "fecam_head.npz"            # base 48-class FeCAM head
+FECAM_ENROLLED_CKPT = CKPT_DIR / "fecam_head_enrolled.npz"   # + user-enrolled classes
 FEATURE_DIM = 512
 HIDDEN_DIM  = 256
 N_CLASSES   = 48
@@ -242,10 +245,60 @@ else:
     _labels = load_labels()
     print("⚠ Checkpoints not found. Run save_checkpoints.py first.")
 
+# ── FeCAM head (backprop-free classifier — beats the GRU head on all metrics;
+#    see reports/cpu_friendly_methods_result.md). Enrollment = one mean vector,
+#    so registering a new action is instant and cannot forget existing classes.
+def _load_fecam():
+    if FECAM_ENROLLED_CKPT.exists():
+        return FeCAMHead.load(FECAM_ENROLLED_CKPT)
+    if FECAM_CKPT.exists():
+        return FeCAMHead.load(FECAM_CKPT)
+    return None
+
+
+_fecam_head = _load_fecam()
+if _fecam_head is not None:
+    print(f"✓ FeCAM head loaded (n_classes={_fecam_head.n_classes})")
+else:
+    print("⚠ FeCAM head not found — run dev/build_fecam_head.py (demo works without it)")
+
+
+def fecam_predict(feat: torch.Tensor, top_k: int = 5):
+    """(1, T, D) feature window -> top-k results in the same format as predict()."""
+    emb = FeCAMHead.window_to_embedding(feat.cpu().numpy())
+    s = _fecam_head.scores(emb[None, :])[0]
+    active = _fecam_head.counts > 0
+    e = np.exp((s - s[active].max()) * 0.5)
+    e[~active] = 0.0
+    probs = e / (e.sum() + 1e-12)
+    top_ids = s.argsort()[::-1][:top_k]
+    out = []
+    for i in top_ids:
+        if not active[i]:
+            continue
+        entry = _labels.get(str(int(i)), {})
+        if isinstance(entry, dict):
+            template = entry.get("template", f"class_{i}")
+            label = entry.get("label", template)
+            examples = entry.get("examples", [])
+        else:
+            template = label = str(entry)
+            examples = []
+        out.append({"class_id": int(i), "template": template, "label": label,
+                    "examples": examples, "prob": float(probs[i])})
+    return out
+
+
 # ── Anomaly / OOD detector ────────────────────────────────────────────────────
 # Higher anomaly score == more out-of-distribution (see src/anomaly/detector.py).
-# Threshold can be calibrated offline via experiments/calibrate_anomaly.py;
-# ANOMALY_THRESHOLD env var overrides the conservative built-in default.
+# ANOMALY_THRESHOLD env var, if set, overrides everything below.
+#
+# BUGFIX: previously, with no env var set (the default `uvicorn app:app` /
+# Docker path), `threshold` stayed None forever and `/predict_anomaly` /
+# `is_anomaly` in the UI badge NEVER fired — the feature silently did nothing
+# out of the box. We now auto-calibrate at startup: real val features if
+# present (local dev), else synthetic in-distribution windows (Docker/Spaces,
+# where data/ isn't shipped) so the badge is functional either way.
 import os as _os
 _ANOMALY_METRIC = _os.environ.get("ANOMALY_METRIC", "energy")
 _anomaly_thr_env = _os.environ.get("ANOMALY_THRESHOLD")
@@ -257,6 +310,45 @@ _anomaly_scorer = AnomalyScorer(
 )
 
 
+def _auto_calibrate_anomaly(scorer: AnomalyScorer, model, target_fpr: float = 0.05) -> str:
+    """Set scorer.threshold from real val features if available, else synthetic
+    in-distribution windows. Returns a short string describing the source."""
+    real_dir = Path("data/features/val")
+    real_files = sorted(real_dir.glob("*.npy"))[:300] if real_dir.exists() else []
+    scores = []
+    if real_files:
+        with torch.no_grad():
+            for p in real_files:
+                x = torch.tensor(np.load(p), dtype=torch.float32).unsqueeze(0)
+                logits, _ = model(x, None)
+                scores.append(scorer.score_logits(logits))
+        source = f"real val features (n={len(scores)})"
+    else:
+        from experiments.calibrate_anomaly import synthetic_in_dist_windows
+        rng = np.random.default_rng(0)
+        windows = synthetic_in_dist_windows(300, model.feature_dim, rng)
+        with torch.no_grad():
+            for w in windows:
+                x = torch.tensor(w, dtype=torch.float32).unsqueeze(0)
+                logits, _ = model(x, None)
+                scores.append(scorer.score_logits(logits))
+        source = f"synthetic in-distribution windows (n={len(scores)}, no data/ shipped)"
+    scorer.calibrate(scores, target_fpr=target_fpr)
+    return source
+
+
+if _anomaly_thr_env:
+    print(f"✓ Anomaly threshold from ANOMALY_THRESHOLD env: {_anomaly_scorer.threshold}")
+elif _gem_model is not None:
+    try:
+        _src = _auto_calibrate_anomaly(_anomaly_scorer, _gem_model)
+        print(f"✓ Anomaly threshold auto-calibrated: {_anomaly_scorer.threshold:.3f} "
+              f"(metric={_ANOMALY_METRIC}, target_fpr=0.05, source={_src})")
+    except Exception as e:
+        print(f"⚠ Anomaly auto-calibration failed ({e}); OOD badge will not fire until "
+              f"ANOMALY_THRESHOLD is set or experiments/calibrate_anomaly.py is run.")
+
+
 # ── 라우트 ─────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
@@ -265,6 +357,8 @@ def health():
         "checkpoints_ready": _ckpt_ready,
         "n_classes": N_CLASSES,
         "device": device,
+        "fecam_ready": _fecam_head is not None,
+        "fecam_n_classes": _fecam_head.n_classes if _fecam_head else 0,
     }
 
 
@@ -310,11 +404,14 @@ async def predict_action(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"Feature extraction failed: {e}")
 
-    return JSONResponse({
+    resp = {
         "filename": file.filename,
         "baseline": predict(_bl_model,  feat, _labels),
         "agem":     predict(_gem_model, feat, _labels),
-    })
+    }
+    if _fecam_head is not None:
+        resp["fecam"] = fecam_predict(feat)
+    return JSONResponse(resp)
 
 
 class RTRequest(dict):
@@ -345,10 +442,13 @@ async def predict_realtime(payload: RTPayload):
         r = predict(model, feat, _labels, top_k=3)
         return r
 
-    return JSONResponse({
+    resp = {
         "baseline": top1(_bl_model),
         "agem":     top1(_gem_model),
-    })
+    }
+    if _fecam_head is not None:
+        resp["fecam"] = fecam_predict(feat, top_k=3)
+    return JSONResponse(resp)
 
 
 # ── Few-shot enrollment: 새 행동 클래스 등록 ──────────────────────────────────
@@ -373,7 +473,7 @@ async def enroll_new_class(
     NOTE: feature 추출에는 ffmpeg 와 실제 영상이 필요하다. 모델/엔드포인트
           로직 자체는 합성 입력으로도 검증 가능하다 (tests 참고).
     """
-    global _gem_model, _gem_ckpt, _labels
+    global _gem_model, _gem_ckpt, _labels, _fecam_head
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready — run save_checkpoints.py first")
     if not label or not label.strip():
@@ -450,6 +550,16 @@ async def enroll_new_class(
     _gem_ckpt  = out_ckpt
     _labels    = new_labels
 
+    # 7. FeCAM 프로토타입 등록 — 평균 벡터 1개 계산이라 밀리초 단위이며,
+    #    기존 클래스 통계를 전혀 건드리지 않아 망각이 구조적으로 불가능.
+    fecam_ms = None
+    if _fecam_head is not None:
+        import time as _time
+        t0 = _time.perf_counter()
+        _fecam_head.enroll_class(new_class_id, [w.numpy() for w in new_windows])
+        _fecam_head.save(FECAM_ENROLLED_CKPT)
+        fecam_ms = (_time.perf_counter() - t0) * 1000
+
     return JSONResponse({
         "status": "ok",
         "new_class_id": new_class_id,
@@ -459,6 +569,7 @@ async def enroll_new_class(
         "checkpoint": str(ENROLLED_CKPT),
         "labels_file": str(ENROLLED_LABELS),
         "live": True,
+        "fecam_ms": fecam_ms,
     })
 
 
@@ -511,17 +622,18 @@ def list_classes():
 
 @app.post("/reset_classes")
 def reset_classes():
-    """등록한 동작을 모두 제거하고 기본 48-class A-GEM 모델로 되돌린다."""
-    global _gem_model, _gem_ckpt, _labels
+    """등록한 동작을 모두 제거하고 기본 48-class 모델(GRU + FeCAM)로 되돌린다."""
+    global _gem_model, _gem_ckpt, _labels, _fecam_head
     if not _ckpt_ready:
         raise HTTPException(503, "checkpoints not ready")
     _gem_model, _gem_ckpt = load_model(CKPT_DIR / "agem_48cls.pt")
     _labels = load_labels()
-    for p in (ENROLLED_CKPT, ENROLLED_LABELS):
+    for p in (ENROLLED_CKPT, ENROLLED_LABELS, FECAM_ENROLLED_CKPT):
         try:
             p.unlink()
         except FileNotFoundError:
             pass
+    _fecam_head = _load_fecam()
     return {"status": "reset", "n_classes": _gem_model.num_classes}
 
 
@@ -618,9 +730,11 @@ HTML_PAGE = """<!DOCTYPE html>
   .method-box { background: #0d1117; border-radius: 8px; padding: 14px; }
   .method-box.baseline { border-left: 3px solid #f85149; }
   .method-box.agem     { border-left: 3px solid #3fb950; }
+  .method-box.fecam    { border-left: 3px solid #1f6feb; }
   .method-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 10px; }
   .method-box.baseline .method-title { color: #f85149; }
   .method-box.agem     .method-title { color: #3fb950; }
+  .method-box.fecam    .method-title { color: #58a6ff; }
 
   .pred-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .pred-rank { color: #8b949e; font-size: 0.75rem; width: 20px; flex-shrink: 0; }
@@ -628,6 +742,7 @@ HTML_PAGE = """<!DOCTYPE html>
   .pred-bar { height: 100%; border-radius: 4px; transition: width 0.5s; }
   .method-box.baseline .pred-bar { background: #f85149; }
   .method-box.agem     .pred-bar { background: #3fb950; }
+  .method-box.fecam    .pred-bar { background: #1f6feb; }
   .pred-label { font-size: 0.78rem; color: #c9d1d9; }
   .pred-prob  { font-size: 0.78rem; color: #8b949e; width: 40px; text-align: right; flex-shrink: 0; }
   .top1-label { font-size: 1rem; font-weight: 700; color: #e6edf3; margin-bottom: 10px; }
@@ -694,7 +809,7 @@ HTML_PAGE = """<!DOCTYPE html>
           <!-- Baseline -->
           <div id="subBaseline" style="background:rgba(200,60,50,0.88);color:#fff;
                border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;
-               backdrop-filter:blur(6px);max-width:46%;text-align:center;
+               backdrop-filter:blur(6px);max-width:31%;text-align:center;
                transition:opacity 0.3s;line-height:1.4">
             <div style="font-size:0.62rem;opacity:0.75;letter-spacing:.5px">BASELINE</div>
             <div id="subBaselineText">—</div>
@@ -703,11 +818,20 @@ HTML_PAGE = """<!DOCTYPE html>
           <!-- A-GEM -->
           <div id="subAgem" style="background:rgba(40,160,60,0.88);color:#fff;
                border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;
-               backdrop-filter:blur(6px);max-width:46%;text-align:center;
+               backdrop-filter:blur(6px);max-width:31%;text-align:center;
                transition:opacity 0.3s;line-height:1.4">
             <div style="font-size:0.62rem;opacity:0.75;letter-spacing:.5px">A-GEM</div>
             <div id="subAgemText">—</div>
             <div id="subAgemProb" style="font-size:0.65rem;opacity:0.7"></div>
+          </div>
+          <!-- FeCAM (backprop-free head) -->
+          <div id="subFecam" style="display:none;background:rgba(31,111,235,0.88);color:#fff;
+               border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;
+               backdrop-filter:blur(6px);max-width:31%;text-align:center;
+               transition:opacity 0.3s;line-height:1.4">
+            <div style="font-size:0.62rem;opacity:0.75;letter-spacing:.5px">FeCAM</div>
+            <div id="subFecamText">—</div>
+            <div id="subFecamProb" style="font-size:0.65rem;opacity:0.7"></div>
           </div>
         </div>
       </div>
@@ -896,7 +1020,7 @@ let captureCount = 0;
 let inferPending = false;
 
 // 안정화용 최근 예측 버퍼
-let predHistory = { baseline: [], agem: [] };  // 최근 STABLE_WINDOW개
+let predHistory = { baseline: [], agem: [], fecam: [] };  // 최근 STABLE_WINDOW개
 
 // 타임라인: A-GEM 예측이 바뀔 때만 기록
 let lastGemLabel = null;
@@ -992,8 +1116,10 @@ function storeAndRender(data) {
 
   const stableBl  = stablePred(predHistory.baseline, rawBl);
   const stableGem = stablePred(predHistory.agem,     rawGem);
+  const stableFe  = (data.fecam && data.fecam.length)
+      ? stablePred(predHistory.fecam, data.fecam[0]) : null;
 
-  updateSubtitle(stableBl, stableGem);
+  updateSubtitle(stableBl, stableGem, stableFe);
 
   // 타임라인: A-GEM 예측이 바뀔 때만 항목 추가
   if (stableGem.label !== lastGemLabel) {
@@ -1004,7 +1130,7 @@ function storeAndRender(data) {
 }
 
 // ── 자막 업데이트 (페이드 효과) ───────────────────────────────────────────────
-function updateSubtitle(bl, gem) {
+function updateSubtitle(bl, gem, fe) {
   document.getElementById('subtitleOverlay').style.display = 'block';
 
   const blText  = document.getElementById('subBaselineText');
@@ -1023,6 +1149,16 @@ function updateSubtitle(bl, gem) {
   }
   blProb.textContent  = (bl.prob  * 100).toFixed(0) + '%';
   gemProb.textContent = (gem.prob * 100).toFixed(0) + '%';
+
+  const feBox = document.getElementById('subFecam');
+  if (fe) {
+    feBox.style.display = 'block';
+    const feText = document.getElementById('subFecamText');
+    if (feText.textContent !== fe.label) { flashElement(feBox); feText.textContent = fe.label; }
+    document.getElementById('subFecamProb').textContent = (fe.prob * 100).toFixed(0) + '%';
+  } else {
+    feBox.style.display = 'none';
+  }
 }
 
 function flashElement(el) {
@@ -1070,7 +1206,7 @@ function startRT() {
   frameBuffer    = [];
   captureCount   = 0;
   inferPending   = false;
-  predHistory    = { baseline: [], agem: [] };
+  predHistory    = { baseline: [], agem: [], fecam: [] };
   lastGemLabel   = null;
 
   document.getElementById('rtBtn').textContent = '⏹ Stop captions';
@@ -1131,7 +1267,9 @@ function renderResults(data) {
   const grid = document.getElementById('resultGrid');
   grid.innerHTML = '';
 
-  for (const [key, label, cls] of [['baseline','Baseline','baseline'], ['agem','A-GEM (best)','agem']]) {
+  const methods = [['baseline','Baseline','baseline'], ['agem','A-GEM','agem']];
+  if (data.fecam) methods.push(['fecam','FeCAM (backprop-free)','fecam']);
+  for (const [key, label, cls] of methods) {
     const preds = data[key];
     const top1  = preds[0];
     const box   = document.createElement('div');
@@ -1277,6 +1415,9 @@ async function runEnroll() {
     out.innerHTML =
       `✅ Enrolled '<b>${data.label}</b>' — class #${data.new_class_id}, ${data.n_classes} classes total ` +
       `(${data.n_examples} examples). It now appears in the live caption 🎉<br>` +
+      (data.fecam_ms != null
+        ? `<span style="color:#58a6ff;font-size:0.8rem">⚡ FeCAM prototype enrolled in ${data.fecam_ms.toFixed(1)} ms (forgetting-free by construction)</span><br>`
+        : ``) +
       `<span style="color:#8b949e;font-size:0.78rem">checkpoint: ${data.checkpoint}</span>`;
     document.getElementById('enrollLabel').value = '';
     document.getElementById('enrollFiles').value = '';
