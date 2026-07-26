@@ -9,7 +9,7 @@ full-48-way 0.157, 학습 42밀리초.** GRU+A-GEM(0.387/0.105/270초)을 모든
 > (`dev/run_modern_cpu_methods.py:186-194`)가 stage 1의 `model.scores(Xva)` **평가 1회를
 > 포함**해 측정한 값이라 **순수 학습 시간이 아니다**. FeCAM은 그 8.7초 중 **99.5%가 평가**이고
 > 실제 fit은 **42.4 ms**다. 정확히 귀속된 fit-only 시간과 하드웨어 무관 FLOPs는
-> [`reports/training_flops_result.md`](training_flops_result.md) 참조. 정확도 수치는 영향 없음.
+> [`reports/flops_result.md`](flops_result.md) 참조. 정확도 수치는 영향 없음.
 
 ## 1. 조사한 방법 계열 (문헌)
 
@@ -127,7 +127,7 @@ train 4800 / val 4702 전량.
 
 ## 7. 우리 방법(GRU+A-GEM) 대비 차이 요약 (Δ = 대안 − 우리)
 
-학습 시간은 **fit-only로 정정**한 값(평가 제외, `reports/training_flops_result.md`),
+학습 시간은 **fit-only로 정정**한 값(평가 제외, `reports/flops_result.md`),
 FLOPs는 하드웨어 무관 지표로 병기:
 
 | 방법 | task-aware (Δ) | full-48 acc (Δ) | full F1 (Δ) | 학습(fit only) | train FLOPs | 버퍼 |

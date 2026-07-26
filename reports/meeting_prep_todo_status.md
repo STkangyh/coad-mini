@@ -136,7 +136,7 @@ Deep SLDA, Ridge RLS/ACIL, RanPAC-lite)을 문헌 조사 후 동일 8-stage 프�
 
 **핵심 발견 (2차 확장 — 최신 방법 포함):** backprop-free 통계 계열이 GRU+A-GEM과 동률을 넘어
 **최신 FeCAM(shared)은 전 지표에서 명확히 우위**(task 0.410 vs 0.387, full-48 0.157 vs 0.105,
-학습 6,400배 빠르고 연산량 1,628배 적음 — `reports/training_flops_result.md`). 통계 계열은 클래스별 통계가 독립 누적이라 **망각이 구조적으로 없음** —
+학습 6,400배 빠르고 연산량 1,628배 적음 — `reports/flops_result.md`). 통계 계열은 클래스별 통계가 독립 누적이라 **망각이 구조적으로 없음** —
 backprop 계열의 진짜 적이 망각(로짓 쏠림)이었음을 역으로 증명. RanDumb(NeurIPS'24)의 "랜덤
 표현이 학습된 표현을 이긴다"도 재현. 최신 문헌 지형(AnaCP NeurIPS'25 = gradient 없이
 joint-training 상한 주장, StPR ICLR'26 = exemplar-free 비디오 CIL SOTA)도 정리 — 프론티어

@@ -1,6 +1,6 @@
-# Training FLOPs 회계 — 하드웨어 무관 효율 지표 병기
+# FLOPs 회계 (학습 + 추론) — 하드웨어 무관 효율 지표 병기
 
-Generated: 2026-07 (auto). 스크립트: [`dev/compute_training_flops.py`](../dev/compute_training_flops.py)
+Generated: 2026-07 (auto). 스크립트: [`dev/compute_flops.py`](../dev/compute_flops.py)
 
 **왜 했나:** 우리 효율 주장이 지금까지 wall-clock뿐이었다. wall-clock은 하드웨어·구현에
 의존해서 edge-CL 문헌 옆에 놓을 수 없다. 서베이가 이 방향 선행연구로 지목한 두 편은 모두
@@ -108,6 +108,66 @@ frozen CLIP ViT-B/32 forward는 **16프레임 윈도우 1개당 141 GFLOPs**.
 - 이는 우리 edge 로드맵에서 **경량 인코더 탐색이 head 최적화보다 훨씬 중요**하다는
   근거이기도 하다(MobileCLIP 시도가 CPU에서 실패한 건 별개 문제 — `mobileclip_result.md`).
 
+## 추론 FLOPs — 16프레임 윈도우 1개 → 예측 1회 (48클래스 등록 상태)
+
+배포에서 중요한 건 데모의 실시간 경로다: 윈도우 하나가 도착하면 배치 없이 즉시 채점.
+두 갈래로 나눠 보고한다 — **steady-state**(1회성 사전계산이 캐시된 뒤의 윈도우당 비용)와
+**per-call extra**(현재 코드가 `scores()` 호출마다 다시 하는 사전계산).
+
+| head | steady-state | per-call extra | 인코더 대비 |
+|---|---|---|---|
+| GRU head | 18.9 M | — (캐시) | 0.0134% |
+| **FeCAM (shared cov)** | **25.3 M** | — (캐시) | 0.0179% |
+| NCM prototype | **59.4 K** | — (캐시) | 0.00004% |
+| Deep SLDA | 57.9 K | **293.6 M** | 0.00004% |
+| Ridge RLS | 57.9 K | **268.4 M** | 0.00004% |
+| RanDumb (RFF 2000) | 2.25 M | **16.38 G** | 0.0016% |
+| **frozen CLIP 인코더** | **141.1 G** | — | **100%** |
+
+### ⭐ 발견 4 — FeCAM은 학습이 싸고 **추론이 비싸다** (GRU보다도)
+
+학습에선 FeCAM이 GRU의 1/1,628인데, **추론에선 오히려 1.33배 비싸다**(25.3 M vs 18.9 M).
+원인은 클래스별 Mahalanobis 계산이라 **등록 클래스 수에 선형 비례**하기 때문 —
+GRU는 클래스가 늘어도 마지막 Linear만 커지는 반면, FeCAM은 클래스마다 D×D 이차형식을 돈다.
+
+**즉 analytic head의 이점은 전적으로 학습/등록 쪽에 있고, 추론 쪽엔 없다.** 논문에서
+"싸다"고 뭉뚱그리면 안 되고 축을 나눠 말해야 한다.
+
+### ⭐ 발견 5 — FeCAM 추론의 실측은 FLOPs보다 30배 더 나쁘다 (구현 문제, 수정 가능)
+
+| | 윈도우당 실측 | FLOPs |
+|---|---|---|
+| GRU forward | 0.365 ms | 18.9 M |
+| FeCAM `predict_window` | **14.4 ms** | 25.3 M |
+| 비율 | **39.5×** | 1.33× |
+
+FLOPs는 1.33배인데 실측은 39.5배 — **30배가 구현 손실**이다. 원인은 `scores()`가
+활성 클래스를 **Python 루프**로 돌며 `einsum`을 n=1로 호출하는 것(`fecam_head.py:120-125`).
+
+동일 연산을 **BLAS 1회로 벡터화**해 검증한 결과(수치 동일성 `np.allclose(rtol=1e-9)` 통과):
+
+| | 윈도우당 | 배수 |
+|---|---|---|
+| 현재 (클래스 루프) | 14.033 ms | 1× |
+| 벡터화 (BLAS 1회) | **0.323 ms** | **43배 빠름** |
+
+**FLOPs는 그대로인데 43배** — 발견 2(SLDA vs FeCAM)와 같은 교훈의 재확인이자, 데모에
+바로 적용 가능한 개선점. 벡터화하면 FeCAM 추론이 GRU(0.365 ms)와 대등해진다.
+현재도 인코더(156 ms) 대비 9%라 데모가 막히진 않지만, 마땅히 0.2%여야 할 몫이다.
+→ 후속 과제로 등록(아래).
+
+### ⭐ 발견 6 — 배포에서 head 선택은 추론 비용에 무의미하다
+
+인코더가 윈도우당 141 GFLOPs로 **전체의 99.98% 이상**을 차지한다. 가장 무거운 head
+(FeCAM 25.3 M)조차 인코더의 **0.018%**다. 즉:
+
+- **추론 비용만 놓고 head를 고를 이유가 없다** — 정확도로 고르면 된다.
+- 실시간 성능을 개선하려면 **인코더를 건드려야 한다**(발견 3과 동일 결론).
+- 단, `per-call extra`를 방치하면 얘기가 달라진다: RanDumb은 호출마다 2000×2000 역행렬
+  (**16.4 GFLOPs**, steady-state의 7,000배)을 다시 계산해 인코더의 12%까지 치솟는다.
+  배치 평가에선 상각돼 안 보이지만 **실시간 루프에선 치명적**. FeCAM만 캐시(`self._cache`)를
+  두고 있고 SLDA/Ridge/RanDumb은 없다 — 이들을 데모에 넣으려면 캐싱이 선결 조건.
+
 ## 문헌과의 비교 가능성
 
 SparCL은 Split CIFAR-10/Tiny-ImageNet에서 DER++ 대비 **최대 23× 적은 training FLOPs**를
@@ -127,12 +187,13 @@ SparCL은 Split CIFAR-10/Tiny-ImageNet에서 DER++ 대비 **최대 23× 적은 t
 ## 재현
 
 ```bash
-python3 dev/compute_training_flops.py
+python3 dev/compute_flops.py
 ```
 
 ## 후속 (미착수)
 
-- **inference FLOPs**도 같은 규약으로 산출 — 현재 학습만 회계함. 데모의 실시간 예측
-  비용을 문헌과 비교하려면 필요.
+- **FeCAM `scores()` 벡터화** — 발견 5에서 43배 개선 여지를 실측·검증 완료(수치 동일성 확인).
+  클래스 루프 + n=1 einsum을 `(K,D) @ (D,D)` 한 번으로 바꾸면 됨. 데모 실시간 경로와
+  배치 평가(발견 1의 8.2초 평가 병목) 양쪽에 동시에 효과.
 - **BudgetCL 식 iteration-budget 프로토콜**로도 보고(`docs/project_focus.md` 갭 9번).
-- FeCAM `scores()` 배치화 — 위 부수 발견 1에서 드러난 평가 병목.
+- SLDA/Ridge/RanDumb에 precision 캐시 추가 — 데모 투입 시 선결 조건(발견 6).

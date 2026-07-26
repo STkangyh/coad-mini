@@ -1,5 +1,6 @@
 """
-Analytic training-FLOPs accounting for every head in our 8-stage SSv2 protocol.
+Analytic FLOPs accounting -- training AND inference -- for every head in our
+8-stage SSv2 protocol.
 
 Why: our efficiency claims so far are wall-clock only (e.g. "FeCAM trains in 8.7s
 vs GRU+A-GEM's ~270s"). Wall-clock is hardware- and implementation-dependent, so
@@ -22,7 +23,7 @@ CONVENTION (stated explicitly because papers differ):
   * elementwise ops (activations, norms) counted at ~1 FLOP/element
   * papers that count a MAC as 1 FLOP would report exactly half of these numbers
 
-Run: python3 dev/compute_training_flops.py
+Run: python3 dev/compute_flops.py
 """
 import sys
 
@@ -163,6 +164,59 @@ def randumb_training_flops(n=N_TRAIN, d=D, rff=RFF_DIM):
     return lift + head
 
 
+# ── INFERENCE: one (T,D) window -> one prediction ─────────────────────────────
+# Deployment shape that matters for us is the demo's real-time path: a single
+# window arrives, the head scores it, no batching. Reported in two parts:
+#   steady-state  = per-window cost once any one-time precomputation is cached
+#   per-call extra = precomputation our current code redoes on EVERY scores()
+# FeCAM caches its precision matrix (self._cache); SLDA/Ridge/RanDumb do NOT --
+# they recompute a DxD (or 2000x2000) inverse/solve inside every scores() call,
+# which is invisible in batch evaluation but crippling for single-window
+# real-time use. Flagged rather than silently idealized.
+def gru_infer_flops():
+    """Forward pass only -- no backward at inference."""
+    return gru_forward_flops()
+
+
+def fecam_infer_flops(d=D, k=C):
+    """mean-pool + Tukey prep, then per-class Mahalanobis via einsum.
+
+    Per class: (x-mu)/sd  then  v @ prec @ v  = d^2 + d MACs. The class loop is
+    what makes this the most expensive analytic head at inference.
+    """
+    pool = T * d + d
+    prep = d * 3 + 2 * d * MAC + d
+    per_class = 2 * d + (d * d + d) * MAC
+    return {"steady": pool + prep + k * per_class, "per_call": 0}
+
+
+def ncm_infer_flops(d=D, k=C):
+    """L2-normalize then one (D,) x (D,K) matvec."""
+    return {"steady": T * d + d + 3 * d + d * k * MAC, "per_call": 0}
+
+
+def slda_infer_flops(d=D, k=C):
+    """Cached form is a single matvec; our code recomputes inv(cov) per call."""
+    steady = T * d + d + d * k * MAC + k
+    per_call = (d ** 3) * MAC + k * d * d * MAC        # inv(cov) + means @ prec
+    return {"steady": steady, "per_call": per_call}
+
+
+def ridge_infer_flops(d=D, k=C):
+    """Cached W is a matvec; our code runs a DxD solve per call."""
+    steady = T * d + d + d * k * MAC
+    per_call = (d ** 3) * MAC                          # np.linalg.solve(G+lam I, C)
+    return {"steady": steady, "per_call": per_call}
+
+
+def randumb_infer_flops(d=D, rff=RFF_DIM, k=C):
+    """RFF lift then matvec; our code inverts a 2000x2000 covariance per call."""
+    lift = d * rff * MAC + rff * 3
+    steady = T * d + d + lift + rff * k * MAC + k
+    per_call = (rff ** 3) * MAC + k * rff * rff * MAC
+    return {"steady": steady, "per_call": per_call}
+
+
 # ── measured wall-clock, FIT ONLY ─────────────────────────────────────────────
 # CORRECTION: the train_s figures in reports/cpu_friendly_methods_result.md and
 # cpu_friendly/modern runners are NOT pure fit time -- their timer brackets a
@@ -243,6 +297,31 @@ def main():
     print(f"  over the {N_TRAIN} train windows {fmt(enc_all)}")
     print(f"  = {enc_all / base:.0f}x the entire GRU+A-GEM training, "
           f"{enc_all / fecam_training_flops()['total']:.0f}x FeCAM's")
+
+    # ── inference ────────────────────────────────────────────────────────────
+    print(f"\n\nINFERENCE -- one {T}-frame window -> one prediction "
+          f"({C} classes enrolled)")
+    print(f"{'head':26s} {'steady-state':>12s}  {'per-call extra':>14s}  "
+          f"{'% of encoder':>12s}")
+    print("-" * 72)
+    inf = [
+        ("GRU head", {"steady": gru_infer_flops(), "per_call": 0}),
+        ("FeCAM (shared cov)", fecam_infer_flops()),
+        ("NCM prototype", ncm_infer_flops()),
+        ("Deep SLDA", slda_infer_flops()),
+        ("Ridge RLS (closed-form)", ridge_infer_flops()),
+        ("RanDumb (RFF 2000)", randumb_infer_flops()),
+    ]
+    for name, d in inf:
+        extra = fmt(d["per_call"]).strip() if d["per_call"] else "-- (cached)"
+        print(f"{name:26s} {fmt(d['steady']):>12s}  {extra:>14s}  "
+              f"{100 * d['steady'] / enc:11.4f}%")
+    print(f"{'frozen CLIP encoder':26s} {fmt(enc):>12s}  {'--':>14s}  "
+          f"{100.0:11.4f}%")
+    print("\n  'per-call extra' = precomputation our code currently redoes inside")
+    print("  every scores() call (a DxD / 2000x2000 inverse or solve). Harmless")
+    print("  when scoring a big batch, dominant for single-window real-time use.")
+    print("  FeCAM caches it; SLDA/Ridge/RanDumb do not -- see reports/flops_result.md.")
 
 
 if __name__ == "__main__":
