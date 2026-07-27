@@ -218,20 +218,25 @@ NCM −1.75 / SLDA −1.58인데 **FeCAM −0.21**. 상세: `reports/encoder_swa
 
 ---
 
-## 발견 — SSv2와 UCF101의 대비가 적용 범위를 규정한다
+## 발견 — SSv2와 UCF101의 대비가 적용 범위를 규정한다 (FeCAM만이 아님, 세 head 확인)
 
-| 벤치마크 | 성격 | 우리 FeCAM |
-|---|---|---|
-| **UCF101** | **static-biased** (appearance로 구별) | **88.84** |
-| SSv2 subset | **temporal-biased** (모션으로만 구별) | 15.7 |
+| head | UCF101 (static) | SSv2 (temporal) | 격차 |
+|---|---|---|---|
+| NCM | 81.4 | 12.4 | −69 |
+| Deep SLDA | 83.5 | 14.1 | −69 |
+| **FeCAM** | **87.4** | **15.7** | **−72** |
 
 "static/temporal-biased"는 **ESSENTIAL 논문이 자기 §4.1에서 쓰는 용어**다.
-즉 **우리 방법의 성패가 데이터셋 성격으로 정확히 예측된다.** 약점 고백이 아니라
-**적용 조건의 명시**이고, TCD의 SSv2 NME 열세 보고와도 완전히 일관된다.
+`dev/run_ssv2_head_curves.py`로 SSv2에서도 UCF101과 같은 8-stage 곡선을 세 head 전부
+뽑아보니 **69~72%p라는 거의 동일한 폭**으로 떨어졌다 — **FeCAM의 공분산 정규화 때문이
+아니라 "frozen CLIP + mean-pool" 계열 전체에 적용되는 구조적 성질**임이 확인됨.
+약점 고백이 아니라 **적용 조건의 명시**이고, TCD의 SSv2 NME 열세 보고와도 완전히 일관된다.
 
 논문 문장: *"appearance-discriminative한 행동에 대해서는 학습 없는 통계 head가
 무거운 학습 방법을 능가하며, motion-discriminative한 경우에는 그렇지 않다.
 우리는 그 경계를 정량화한다."*
+
+> 📊 그림: `figures/ssv2_head_curves.png`, `figures/static_vs_temporal.png`
 
 ---
 

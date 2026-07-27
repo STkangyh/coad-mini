@@ -82,12 +82,23 @@ TCD 대비 **+14.0**, STSP 대비 **+7.7**. **backprop 0회, exemplar 0개, 백�
 
 같은 head, 같은 인코더인데 결과가 극단적으로 다릅니다. 이 대비가 오히려 우리 방법이 어디까지 통하는지를 규정합니다.
 
-| 벤치마크 | 성격 | 우리 FeCAM |
-| --- | --- | --- |
-| **UCF101** | static-biased — 외형으로 구별 | **88.84** |
-| SSv2 (48-class subset) | temporal-biased — 모션으로만 구별 | 15.70 |
+> 🖼 **그림 삽입 → `ssv2_head_curves.png`**
+> SSv2에서 같은 3개 head(NCM/SLDA/FeCAM)를 UCF101과 똑같은 8-stage 곡선으로 그린 것. 세 선이 처음부터 끝까지 거의 나란히 내려갑니다.
 
-“static / temporal-biased”는 우리가 만든 용어가 아니라 **ESSENTIAL 논문이 자기 §4.1에서 쓰는 분류**입니다.
+“static / temporal-biased”는 우리가 만든 용어가 아니라 **ESSENTIAL 논문이 자기 §4.1에서 쓰는 분류**입니다(UCF101·HMDB51·ActivityNet·Kinetics = static, SSv2만 temporal).
+
+### FeCAM만의 현상이 아닙니다 — 세 head 전부 같은 폭으로 떨어집니다
+
+> 🖼 **그림 삽입 → `static_vs_temporal.png`**
+> 세 head의 UCF101 vs SSv2 최종 정확도를 나란히 놓은 막대그래프. 격차가 head와 무관하게 거의 일정합니다.
+
+| head | UCF101 (static) | SSv2 (temporal) | 격차 |
+| --- | --- | --- | --- |
+| NCM | 81.4 | 12.4 | **−69** |
+| Deep SLDA | 83.5 | 14.1 | **−69** |
+| **FeCAM** | **87.4** | **15.7** | **−72** |
+
+세 head 모두 **69~72%p라는 거의 동일한 폭**으로 떨어집니다. 즉 이 격차는 FeCAM의 공분산 정규화 유무와 무관하게 **“frozen CLIP + mean-pool” 계열 전체에 적용되는 구조적 성질**입니다 — head를 뭘 쓰든 인코더가 appearance만 보므로 생기는 한계라는 뜻입니다.
 
 논문 문장으로 쓸 것:
 

@@ -206,15 +206,26 @@ BODY = f"""
   <h2><span class="sn">04</span> 적용 범위를 정량화했다</h2>
   <div class="col"><p>같은 head, 같은 인코더인데 결과가 극단적으로 다릅니다.
   이 대비가 오히려 우리 방법이 어디까지 통하는지를 규정합니다.</p></div>
+  {fig("ssv2_head_curves", "SSv2에서 같은 3개 head(NCM/SLDA/FeCAM)를 UCF101과 똑같은 8-stage 곡선으로 그린 것. 세 선이 처음부터 끝까지 거의 나란히 내려갑니다.")}
+  <div class="col"><p>&ldquo;static / temporal-biased&rdquo;는 우리가 만든 용어가 아니라
+  <b>ESSENTIAL 논문이 자기 &sect;4.1에서 쓰는 분류</b>입니다(UCF101&middot;HMDB51&middot;ActivityNet&middot;Kinetics = static,
+  SSv2만 temporal).</p></div>
+
+  <h3>FeCAM만의 현상이 아닙니다 &mdash; 세 head 전부 같은 폭으로 떨어집니다</h3>
+  {fig("static_vs_temporal", "세 head의 UCF101 vs SSv2 최종 정확도를 나란히 놓은 막대그래프. 격차가 head와 무관하게 거의 일정합니다.")}
+
   <div class="tablewrap"><table>
-    <thead><tr><th>벤치마크</th><th>성격</th><th style="text-align:right">우리 FeCAM</th></tr></thead>
+    <thead><tr><th>head</th><th style="text-align:right">UCF101 (static)</th><th style="text-align:right">SSv2 (temporal)</th><th style="text-align:right">격차</th></tr></thead>
     <tbody>
-      <tr class="us"><td>UCF101</td><td>static-biased — 외형으로 구별</td><td class="n">88.84</td></tr>
-      <tr><td>SSv2 (48-class subset)</td><td>temporal-biased — 모션으로만 구별</td><td class="n">15.70</td></tr>
+      <tr><td>NCM</td><td class="n">81.4</td><td class="n">12.4</td><td class="n">&minus;69</td></tr>
+      <tr><td>Deep SLDA</td><td class="n">83.5</td><td class="n">14.1</td><td class="n">&minus;69</td></tr>
+      <tr class="us"><td>FeCAM</td><td class="n">87.4</td><td class="n">15.7</td><td class="n">&minus;72</td></tr>
     </tbody>
   </table></div>
-  <div class="col"><p class="small muted">&ldquo;static / temporal-biased&rdquo;는 우리가 만든 용어가 아니라
-  <b>ESSENTIAL 논문이 자기 §4.1에서 쓰는 분류</b>입니다.</p>
+  <div class="col"><p>세 head 모두 <b>69~72%p라는 거의 동일한 폭</b>으로 떨어집니다. 즉 이 격차는
+  FeCAM의 공분산 정규화 유무와 무관하게 <b>&ldquo;frozen CLIP + mean-pool&rdquo; 계열 전체에
+  적용되는 구조적 성질</b>입니다 &mdash; head를 뭘 쓰든 인코더가 appearance만 보므로
+  생기는 한계라는 뜻입니다.</p>
   <p style="margin-top:12px">논문 문장: <i>&ldquo;외형으로 구별되는 행동에는 학습 없는 통계 head가
   무거운 학습 방법을 능가하고, 모션으로만 구별되는 행동에는 그렇지 않다.
   우리는 그 경계를 정량화한다.&rdquo;</i></p></div>
