@@ -129,6 +129,87 @@ def fig_cifar_bridge():
     plt.close(fig)
 
 
+def fig_ssv2_curves():
+    d = json.loads((ROOT / "reports/ssv2_head_curves_raw.json").read_text())
+    xs = [6 * i for i in range(1, 9)]
+    cur = lambda k: 100 * np.array(d[k]["per_step"])  # noqa: E731
+    fecam, slda, ncm = (cur("FeCAM (shared cov)"), cur("Deep SLDA"),
+                        cur("NCM prototype"))
+
+    fig, ax = plt.subplots(figsize=(8.4, 5.2), facecolor=SURFACE)
+    plot_series(ax, xs, fecam, S1, "FeCAM")
+    plot_series(ax, xs, slda, S2, "Deep SLDA")
+    plot_series(ax, xs, ncm, S3, "NCM")
+
+    style_axes(ax, "Classes seen", "Accuracy over seen classes (%)")
+    ax.set_xticks(xs)
+    ax.set_xlim(3, 58)
+    ax.set_ylim(0, 55)
+    ax.set_title("SSv2 (our 48-class subset), same 3 heads as UCF101",
+                 color=INK, fontsize=13, fontweight="semibold", pad=30,
+                 loc="left")
+    ax.text(0, 1.018,
+            "true class-IL, no task id · 8-stage curriculum order",
+            transform=ax.transAxes, color=INK_2, fontsize=10)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
+              fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=3)
+    fig.tight_layout()
+    for ext in ("png", "svg"):
+        fig.savefig(OUT / f"ssv2_head_curves.{ext}", dpi=200, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def fig_static_vs_temporal():
+    """Same three heads, final accuracy on each benchmark -- do they all drop
+    by roughly the same amount, or is the UCF101/SSv2 gap FeCAM-specific?"""
+    ucf = json.loads((ROOT / "reports/ucf101_tcd_raw.json").read_text())
+    ssv2 = json.loads((ROOT / "reports/ssv2_head_curves_raw.json").read_text())
+    heads = ["NCM prototype", "Deep SLDA", "FeCAM (shared cov)"]
+    labels = ["NCM", "Deep SLDA", "FeCAM"]
+    ucf_vals = [100 * ucf[f"inc10/{h}"]["last"] for h in heads]
+    ssv2_vals = [100 * ssv2[h]["last"] for h in heads]
+
+    fig, ax = plt.subplots(figsize=(8.4, 4.6), facecolor=SURFACE)
+    ax.set_facecolor(SURFACE)
+    x = np.arange(len(heads))
+    w = 0.32
+    b1 = ax.bar(x - w / 2, ucf_vals, width=w, color=S1, zorder=3,
+               label="UCF101 (static-biased)")
+    b2 = ax.bar(x + w / 2, ssv2_vals, width=w, color=S2, zorder=3,
+               label="SSv2 (temporal-biased)")
+    for bars, vals in ((b1, ucf_vals), (b2, ssv2_vals)):
+        for rect, v in zip(bars, vals):
+            ax.annotate(f"{v:.1f}", xy=(rect.get_x() + rect.get_width() / 2, v),
+                        xytext=(0, 6), textcoords="offset points",
+                        ha="center", color=INK, fontsize=10)
+    for xi, uv, sv in zip(x, ucf_vals, ssv2_vals):
+        ax.annotate(f"−{uv - sv:.0f}", xy=(xi, (uv + sv) / 2),
+                    xytext=(28, 0), textcoords="offset points",
+                    ha="left", va="center", color=INK_2, fontsize=10)
+
+    ax.set_xticks(x, labels, color=INK_2, fontsize=11)
+    ax.set_ylim(0, 100)
+    ax.grid(True, axis="y", color=GRID, linewidth=1.0, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(AXIS)
+    ax.tick_params(colors=INK_2, labelsize=10, length=0)
+    ax.set_ylabel("Final accuracy (%)", color=INK_2, fontsize=11, labelpad=8)
+    ax.set_title("The static/temporal gap is structural, not FeCAM-specific",
+                 color=INK, fontsize=13, fontweight="semibold", pad=30,
+                 loc="left")
+    ax.text(0, 1.03, "same encoder, same 3 heads, last-session accuracy on each benchmark",
+            transform=ax.transAxes, color=INK_2, fontsize=10)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.12),
+              fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=2)
+    fig.tight_layout()
+    for ext in ("png", "svg"):
+        fig.savefig(OUT / f"static_vs_temporal.{ext}", dpi=200, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def fig_increment_sensitivity():
     """One measure, one series -> bars. Each paper's own UCF101 numbers."""
     rows = [                     # (label, coarse 10x5, fine 2x25)
@@ -187,6 +268,8 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     fig_ucf101()
     fig_cifar_bridge()
+    fig_ssv2_curves()
+    fig_static_vs_temporal()
     fig_increment_sensitivity()
     for p in sorted(OUT.glob("*.*")):
         print(f"  {p.relative_to(ROOT)}  ({p.stat().st_size//1024} KB)")

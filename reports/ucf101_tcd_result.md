@@ -121,6 +121,23 @@ NCM·SLDA도 마찬가지(0.09%p, 0.04%p).
 "static-biased / temporal-biased" 분류는 우리가 만든 게 아니라 **ESSENTIAL 논문이
 자기 §4.1에서 쓰는 용어**다(UCF101·HMDB51·ActivityNet·Kinetics = static, SSv2만 temporal).
 
+### FeCAM만의 현상이 아님 — 세 head 전부 같은 폭으로 떨어진다
+
+SSv2에서도 UCF101과 똑같은 프로토콜(8-stage 곡선, 세 head 전부)로 재현했다.
+스크립트: [`dev/run_ssv2_head_curves.py`](../dev/run_ssv2_head_curves.py), 원시결과
+`reports/ssv2_head_curves_raw.json`.
+
+| head | UCF101 (static) | SSv2 (temporal) | 격차 |
+|---|---|---|---|
+| NCM | 81.4 | 12.4 | **−69** |
+| Deep SLDA | 83.5 | 14.1 | **−69** |
+| **FeCAM** | **87.4** | **15.7** | **−72** |
+
+세 head 모두 **69~72%p라는 거의 동일한 폭**으로 떨어진다. 즉 이 격차는 FeCAM의
+공분산 정규화 유무와 무관하게 **"frozen CLIP + mean-pool" 계열 전체에 적용되는
+구조적 성질** — head를 뭘 쓰든 인코더가 appearance만 보므로 생기는 한계라는 뜻이다.
+(→ 그림: `figures/ssv2_head_curves.png`, `figures/static_vs_temporal.png`)
+
 즉 **frozen CLIP + mean-pool의 성공/실패가 데이터셋 성격으로 정확히 예측된다.**
 이건 약점 고백이 아니라 **적용 조건을 명시하는 것**이고, TCD가 SSv2에서 NME 열세를
 보고한 것과도 완전히 일관된다(`reports/base_heavy_split_result.md`).
