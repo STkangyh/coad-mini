@@ -272,7 +272,40 @@ BODY = f"""
 </section>
 
 <section>
-  <h2><span class="sn">08</span> 정직한 caveat &amp; 다음 단계</h2>
+  <h2><span class="sn">08</span> 인코더 자체를 바꿔봤다</h2>
+  <div class="col"><p>head는 다섯 개를 비교했으면서 <b>인코더는 한 번도 바꿔보지 않았습니다.</b>
+  그런데 인코더가 <b>추론 비용의 99.98%, 학습 전체의 146배</b>를 차지합니다 —
+  edge 성능을 실제로 결정하는 건 head가 아니라 인코더입니다.
+  (원래 막혀 있던 실험인데, UCF101 원본 영상을 확보하면서 풀렸습니다.)</p></div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>인코더</th><th style="text-align:right">파라미터</th><th style="text-align:right">UCF101 FeCAM</th><th style="text-align:right">CPU ms/window</th></tr></thead>
+    <tbody>
+      <tr class="us"><td>CLIP ViT-B/32 <span class="muted">(현재)</span></td><td class="n">87.5M</td><td class="n">88.84 ±0.52</td><td class="n">148</td></tr>
+      <tr><td>MobileCLIP-S0</td><td class="n">10.9M</td><td class="n">88.63 ±0.67</td><td class="n">2,985</td></tr>
+      <tr><td class="muted">차이</td><td class="n">8× 작음</td><td class="n">−0.21 %p</td><td class="n">20× 느림</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <div class="t">파라미터 수가 edge 지연을 예측하지 못합니다</div>
+    <p>파라미터 8배 작은 모델이 CPU에서 <b>20배 느립니다</b>. 오차가 아니라 <b>설계 의도의 결과</b>입니다 —
+    MobileCLIP은 Apple의 CoreML/ANE 커널을 겨냥해 만들어져, 범용 PyTorch에서는 이점이
+    전혀 살아나지 않습니다. 우리가 읽은 edge-CL 선행연구 어느 쪽도 이 지점을 다루지 않습니다
+    (SparCL은 희소화 가속률을, BudgetCL은 하드웨어를 추상화한 iteration 수를 보고).</p>
+  </div>
+
+  <div class="col"><p><b>그리고 좋은 head는 인코더 요구사항을 낮춥니다.</b>
+  약한 인코더로 바꿨을 때 손실이 NCM −1.75, SLDA −1.58인데 <b>FeCAM은 −0.21</b>입니다 —
+  공분산 정규화가 feature 품질 저하를 상당 부분 흡수합니다.</p>
+  <p style="margin-top:12px"><b>결론:</b> CLIP B/32를 계속 쓰는 것이 맞지만,
+  <b>&ldquo;더 정확해서&rdquo;가 아니라</b>(0.21%p는 의미 없음)
+  <b>우리가 실제로 가진 런타임에서 20배 빠르기 때문</b>입니다.
+  CoreML/ANE 배포 경로를 잡으면 결론이 뒤집힐 수 있어 후속 과제로 남겼습니다.</p></div>
+</section>
+
+<section>
+  <h2><span class="sn">09</span> 정직한 caveat &amp; 다음 단계</h2>
   <div class="col">
     <h3>논문에 반드시 병기할 것</h3>
     <ul style="margin-top:8px">
