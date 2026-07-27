@@ -138,6 +138,26 @@ SSv2에서도 UCF101과 똑같은 프로토콜(8-stage 곡선, 세 head 전부)�
 구조적 성질** — head를 뭘 쓰든 인코더가 appearance만 보므로 생기는 한계라는 뜻이다.
 (→ 그림: `figures/ssv2_head_curves.png`, `figures/static_vs_temporal.png`)
 
+### GRU+A-GEM도 같이 그려보니 — 다른 이유로 격차가 작다 (정직한 추가 관찰)
+
+[`dev/run_ssv2_gru_curve.py`](../dev/run_ssv2_gru_curve.py)로 GRU+A-GEM도 SSv2에서
+같은 8-stage 곡선을 뽑아 `ssv2_head_curves.png`에 네 번째 선으로 추가했다
+(3 seed 평균, 최종값 10.49% — 기존 기록 0.105와 일치해 정합성 검증됨).
+
+| 방법 | UCF101 last | SSv2 last | 격차 |
+|---|---|---|---|
+| NCM / SLDA / FeCAM | 81.4~87.4 | 12.4~15.7 | **−69~−72** |
+| **GRU + A-GEM** | 52.30 | 10.49 | **−41.8** |
+
+**GRU의 격차가 오히려 작다** — 그런데 이건 "GRU가 인코더 한계에 덜 시달린다"는 뜻이
+아니라 **UCF101에서 이미 망각으로 크게 깎여 있어서 "떨어질 여지"가 적기 때문**이다.
+GRU는 UCF101에서도 FeCAM보다 35%p 낮은 52.30에 머무는데(§"우리 자체 baseline" 절의
+망각 붕괴 참고), 그 낮은 출발점에서 SSv2로 가니 절대폭이 작게 보이는 것뿐이다.
+
+즉 **"69~72%p 균일 격차" 발견은 backprop-free analytic head 계열에 한정된 관찰**이고,
+gradient 기반 방법(GRU+A-GEM)에는 같은 논리가 그대로 적용되지 않는다 — 다른 실패
+모드(망각)가 이미 지배적이라서다. 논문에는 이 구분을 명시해야 한다.
+
 즉 **frozen CLIP + mean-pool의 성공/실패가 데이터셋 성격으로 정확히 예측된다.**
 이건 약점 고백이 아니라 **적용 조건을 명시하는 것**이고, TCD가 SSv2에서 NME 열세를
 보고한 것과도 완전히 일관된다(`reports/base_heavy_split_result.md`).

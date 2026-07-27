@@ -131,28 +131,31 @@ def fig_cifar_bridge():
 
 def fig_ssv2_curves():
     d = json.loads((ROOT / "reports/ssv2_head_curves_raw.json").read_text())
+    gru = json.loads((ROOT / "reports/ssv2_gru_curve_raw.json").read_text())
     xs = [6 * i for i in range(1, 9)]
     cur = lambda k: 100 * np.array(d[k]["per_step"])  # noqa: E731
     fecam, slda, ncm = (cur("FeCAM (shared cov)"), cur("Deep SLDA"),
                         cur("NCM prototype"))
+    gru_c = 100 * np.array(gru["per_step_mean"])
 
     fig, ax = plt.subplots(figsize=(8.4, 5.2), facecolor=SURFACE)
     plot_series(ax, xs, fecam, S1, "FeCAM")
     plot_series(ax, xs, slda, S2, "Deep SLDA")
     plot_series(ax, xs, ncm, S3, "NCM")
+    plot_series(ax, xs, gru_c, S4, "GRU + A-GEM")
 
     style_axes(ax, "Classes seen", "Accuracy over seen classes (%)")
     ax.set_xticks(xs)
     ax.set_xlim(3, 58)
     ax.set_ylim(0, 55)
-    ax.set_title("SSv2 (our 48-class subset), same 3 heads as UCF101",
+    ax.set_title("SSv2 (our 48-class subset), same setup as UCF101",
                  color=INK, fontsize=13, fontweight="semibold", pad=30,
                  loc="left")
     ax.text(0, 1.018,
-            "true class-IL, no task id · 8-stage curriculum order",
+            "true class-IL, no task id · 8-stage curriculum order · GRU: 3-seed mean",
             transform=ax.transAxes, color=INK_2, fontsize=10)
     ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
-              fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=3)
+              fontsize=10, labelcolor=INK_2, handlelength=1.6, ncols=4)
     fig.tight_layout()
     for ext in ("png", "svg"):
         fig.savefig(OUT / f"ssv2_head_curves.{ext}", dpi=200, facecolor=SURFACE)

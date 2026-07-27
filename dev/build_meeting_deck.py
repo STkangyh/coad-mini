@@ -206,7 +206,7 @@ BODY = f"""
   <h2><span class="sn">04</span> 적용 범위를 정량화했다</h2>
   <div class="col"><p>같은 head, 같은 인코더인데 결과가 극단적으로 다릅니다.
   이 대비가 오히려 우리 방법이 어디까지 통하는지를 규정합니다.</p></div>
-  {fig("ssv2_head_curves", "SSv2에서 같은 3개 head(NCM/SLDA/FeCAM)를 UCF101과 똑같은 8-stage 곡선으로 그린 것. 세 선이 처음부터 끝까지 거의 나란히 내려갑니다.")}
+  {fig("ssv2_head_curves", "SSv2에서 같은 4개 방법(NCM/SLDA/FeCAM/GRU+A-GEM)을 UCF101과 똑같은 8-stage 곡선으로 그린 것. 세 통계 head는 거의 나란히 내려가고, GRU는 더 낮은 곳에서 출렁입니다.")}
   <div class="col"><p>&ldquo;static / temporal-biased&rdquo;는 우리가 만든 용어가 아니라
   <b>ESSENTIAL 논문이 자기 &sect;4.1에서 쓰는 분류</b>입니다(UCF101&middot;HMDB51&middot;ActivityNet&middot;Kinetics = static,
   SSv2만 temporal).</p></div>
@@ -215,18 +215,28 @@ BODY = f"""
   {fig("static_vs_temporal", "세 head의 UCF101 vs SSv2 최종 정확도를 나란히 놓은 막대그래프. 격차가 head와 무관하게 거의 일정합니다.")}
 
   <div class="tablewrap"><table>
-    <thead><tr><th>head</th><th style="text-align:right">UCF101 (static)</th><th style="text-align:right">SSv2 (temporal)</th><th style="text-align:right">격차</th></tr></thead>
+    <thead><tr><th>방법</th><th style="text-align:right">UCF101 (static)</th><th style="text-align:right">SSv2 (temporal)</th><th style="text-align:right">격차</th></tr></thead>
     <tbody>
       <tr><td>NCM</td><td class="n">81.4</td><td class="n">12.4</td><td class="n">&minus;69</td></tr>
       <tr><td>Deep SLDA</td><td class="n">83.5</td><td class="n">14.1</td><td class="n">&minus;69</td></tr>
       <tr class="us"><td>FeCAM</td><td class="n">87.4</td><td class="n">15.7</td><td class="n">&minus;72</td></tr>
+      <tr><td>GRU + A-GEM</td><td class="n">52.3</td><td class="n">10.5</td><td class="n">&minus;41.8</td></tr>
     </tbody>
   </table></div>
-  <div class="col"><p>세 head 모두 <b>69~72%p라는 거의 동일한 폭</b>으로 떨어집니다. 즉 이 격차는
+  <div class="col"><p>세 통계 head 모두 <b>69~72%p라는 거의 동일한 폭</b>으로 떨어집니다. 즉 이 격차는
   FeCAM의 공분산 정규화 유무와 무관하게 <b>&ldquo;frozen CLIP + mean-pool&rdquo; 계열 전체에
-  적용되는 구조적 성질</b>입니다 &mdash; head를 뭘 쓰든 인코더가 appearance만 보므로
-  생기는 한계라는 뜻입니다.</p>
-  <p style="margin-top:12px">논문 문장: <i>&ldquo;외형으로 구별되는 행동에는 학습 없는 통계 head가
+  적용되는 구조적 성질</b>입니다.</p></div>
+
+  <div class="callout warn">
+    <div class="t">정직하게 병기할 것 &mdash; GRU는 다른 이유로 격차가 작습니다</div>
+    <p><b>GRU+A-GEM의 격차(&minus;41.8)가 더 작다고 해서 인코더 한계에 덜 시달리는 게 아닙니다.</b>
+    GRU는 UCF101에서도 이미 망각 때문에 52.3에 머물러(FeCAM보다 35점 낮음) &ldquo;떨어질 여지&rdquo;가
+    애초에 적을 뿐입니다. <b>&ldquo;69~72%p 균일 격차&rdquo; 발견은 backprop-free head 계열에
+    한정된 관찰</b>이고, gradient 기반 방법에는 다른 실패 모드(망각)가 이미 지배적이라 같은
+    논리가 그대로 적용되지 않습니다.</p>
+  </div>
+
+  <div class="col"><p style="margin-top:12px">논문 문장: <i>&ldquo;외형으로 구별되는 행동에는 학습 없는 통계 head가
   무거운 학습 방법을 능가하고, 모션으로만 구별되는 행동에는 그렇지 않다.
   우리는 그 경계를 정량화한다.&rdquo;</i></p></div>
 </section>
