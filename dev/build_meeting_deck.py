@@ -305,6 +305,24 @@ BODY = f"""
 </section>
 
 <section>
+  <h2><span class="sn">08b</span> 자주 나올 질문 &mdash; 정확도가 너무 높은 거 아닌가?</h2>
+  <div class="col"><p>UCF101 파일명은 <code>v_ApplyEyeMakeup_g08_c01.avi</code>처럼
+  <b>group 번호</b>를 담고 있습니다. 같은 group의 클립들은 <b>원본 영상 하나를 잘라 만든 것</b>이라
+  같은 사람·배경·조명이 거의 그대로 반복됩니다. 클립 단위로 무작위 분할하면 train/test에
+  사실상 같은 영상이 섞여 정확도가 부풀려질 수 있습니다 &mdash; 공식 split은 이를 막기 위해
+  <b>group을 통째로</b> 한쪽에만 배정합니다.</p></div>
+
+  <div class="tablewrap"><table>
+    <tbody>
+      <tr><td>train group 수</td><td class="n">1,818</td></tr>
+      <tr><td>test group 수</td><td class="n">707</td></tr>
+      <tr class="us"><td>겹치는 group</td><td class="n">0</td></tr>
+    </tbody>
+  </table></div>
+  <p class="col"><b>누수 없음.</b> 88.84는 데이터 누수로 부풀려진 수치가 아닙니다.</p>
+</section>
+
+<section>
   <h2><span class="sn">09</span> 정직한 caveat &amp; 다음 단계</h2>
   <div class="col">
     <h3>논문에 반드시 병기할 것</h3>
