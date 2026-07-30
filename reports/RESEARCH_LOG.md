@@ -420,6 +420,23 @@ GRU+A-GEM은 base 세션 직후 붕괴하는 메커니즘까지 확인(고정 me
 
 날짜순. 위 요약보다 상세한 표·해석·재현 명령은 각 원본에 있다.
 
+### 실험이 아닌 문서 (위 본문에 항목이 없는 4개)
+
+발표·보고용으로 만든 것들이라 실험 항목으로는 들어가 있지 않다. 내용은 전부 위 실험
+항목에서 파생됐으므로 **수치의 출처는 항상 해당 실험 리포트**이고, 아래는 그 재구성이다.
+
+| 파일 | 날짜 | 무엇 |
+|---|---|---|
+| [meeting_prep_todo_status.md](meeting_prep_todo_status.md) | 07-13 | 교수님 미팅 준비 TODO 7항목의 완료 상태 추적 |
+| [meeting_script_0726.md](meeting_script_0726.md) | 07-26 | 미팅에서 **말로** 설명하기 위한 발표 스크립트 |
+| [meeting_deck_notion.md](meeting_deck_notion.md) | 07-27 | Notion 업로드용 발표 페이지(그래프 포함) |
+| [progress_since_2026-07-17.md](progress_since_2026-07-17.md) | 07-27 | 7/17 이후 진행사항만 모은 요약 |
+
+⚠️ 이 4개는 **작성 시점에 고정**돼 있어 7/30 작업(SSv2 pooling, 실시간 측정, 배포)이
+반영돼 있지 않다. 현재 수치는 [§ 현재 상태](#현재-상태-2026-07-30-기준)를 볼 것.
+
+### 실험 리포트
+
 | 날짜 | 파일 |
 |---|---|
 | 06-05 | [capacity_ablation_cv_report.md](capacity_ablation_cv_report.md) · [next_experiment_priority.md](next_experiment_priority.md) |
