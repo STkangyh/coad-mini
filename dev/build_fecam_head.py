@@ -4,7 +4,10 @@ Build the FeCAM head checkpoint for the demo app.
 Fits FeCAMHead on the 48-class training features (CLIP B/32) and saves it to
 checkpoints/fecam_head.npz, then sanity-checks on val (both eval regimes).
 
-Run: python3 dev/build_fecam_head.py
+The window pooling is baked into the checkpoint, so this must be rebuilt when the
+default changes -- the served head pools requests the same way it was fitted.
+
+Run: python3 dev/build_fecam_head.py [pooling]      # default: DEFAULT_POOLING
 """
 import sys, time
 from pathlib import Path
@@ -13,7 +16,7 @@ sys.path.insert(0, ".")
 
 import numpy as np
 
-from src.models.fecam_head import FeCAMHead
+from src.models.fecam_head import DEFAULT_POOLING, POOLINGS, FeCAMHead
 from src.trainer import load_samples
 
 FEATURE_DIR = Path("data/features")
@@ -23,24 +26,27 @@ CPS = 6
 STAGES = {s: list(range((s - 1) * CPS, s * CPS)) for s in range(1, N_CLASSES // CPS + 1)}
 
 
-def load_split(split):
+def load_split(split, pooling):
+    """Pools with the same function the served head will use at request time."""
+    pool = POOLINGS[pooling]
     samples = load_samples(f"data/subset/{split}_mini.json")
     X, y = [], []
     d = FEATURE_DIR / ("train" if split == "train" else "val")
     for s in samples:
         p = d / f"{s['id']}.npy"
         if p.exists():
-            X.append(np.load(p).mean(axis=0))
+            X.append(pool(np.load(p).astype(np.float64)))
             y.append(s["class_id"])
     return np.stack(X).astype(np.float64), np.array(y)
 
 
 def main():
-    Xtr, ytr = load_split("train")
-    Xva, yva = load_split("val")
-    print(f"train {Xtr.shape}, val {Xva.shape}")
+    pooling = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_POOLING
+    Xtr, ytr = load_split("train", pooling)
+    Xva, yva = load_split("val", pooling)
+    print(f"pooling={pooling}  train {Xtr.shape}, val {Xva.shape}")
 
-    head = FeCAMHead(feature_dim=Xtr.shape[1], max_classes=256)
+    head = FeCAMHead(feature_dim=Xtr.shape[1], max_classes=256, pooling=pooling)
     t0 = time.perf_counter()
     # stage-wise observe (equivalent to batch for means/cov; mirrors CL arrival)
     for cids in STAGES.values():

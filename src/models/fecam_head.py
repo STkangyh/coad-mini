@@ -13,7 +13,10 @@ Key property for the demo: enrolling a NEW class = computing one mean vector
 are untouched) — forgetting-free enrollment by construction.
 
 Input convention: a "window" is the CLIP feature array of shape (T, D)
-(e.g. (16, 512)); the head mean-pools over T internally.
+(e.g. (16, 512)); `window_to_embedding` collapses T into one vector using this
+head's `pooling`. The default is `chunks3_adjdiff`, which keeps temporal order
+and so makes feature_dim 5x the per-frame dimension (2560 for CLIP B/32);
+`mean` is the older order-blind pooling, kept so existing checkpoints load.
 """
 from __future__ import annotations
 
@@ -31,12 +34,58 @@ def _tukey(X: np.ndarray, lam: float = TUKEY_LAMBDA) -> np.ndarray:
     return np.sign(X) * (np.abs(X) ** lam)
 
 
+# ── window poolings: (T, D) per-frame features -> one vector ─────────────────
+# A window has to become a single vector before FeCAM sees it. How that is done
+# decides whether temporal order survives, which is worth far more than it looks:
+# mean-pool maps "push left-to-right" and "push right-to-left" to the SAME vector.
+# See reports/ssv2_temporal_pooling_result.md for the comparison.
+
+def _pool_mean(w: np.ndarray) -> np.ndarray:
+    """Order-blind average. The original default; kept for old checkpoints."""
+    return w.mean(axis=0)
+
+
+def _pool_chunks3_adjdiff(w: np.ndarray) -> np.ndarray:
+    """Three temporal segment means + the differences between adjacent segments.
+
+    The segments say what the window looked like in each third; the adjacent
+    differences say how it changed between thirds, and they flip sign when the
+    action is reversed -- which is exactly what mean-pool destroys. Output is 5x
+    the per-frame dimension (3 segments + 2 differences).
+
+    Closed form: no parameters, no gradients. Worth +8.97pp on SSv2 and +1.17pp
+    on UCF101 over mean-pool; 3 segments beat 2, 4, 6 and 8.
+    """
+    d = w.shape[1]
+    if len(w) < 3:                      # too short to segment: repeat the tail
+        w = np.concatenate([w, np.repeat(w[-1:], 3 - len(w), axis=0)])
+    idx = np.linspace(0, len(w), 4).astype(int)
+    c = np.concatenate([w[idx[i]:idx[i + 1]].mean(axis=0) for i in range(3)])
+    return np.concatenate([c, c[d:2 * d] - c[:d], c[2 * d:] - c[d:2 * d]])
+
+
+POOLINGS = {"mean": _pool_mean, "chunks3_adjdiff": _pool_chunks3_adjdiff}
+POOLING_DIM_FACTOR = {"mean": 1, "chunks3_adjdiff": 5}
+DEFAULT_POOLING = "chunks3_adjdiff"
+
+
+def pooled_dim(frame_dim: int, pooling: str = DEFAULT_POOLING) -> int:
+    """Head feature_dim implied by a per-frame dimension and a pooling."""
+    return frame_dim * POOLING_DIM_FACTOR[pooling]
+
+
 class FeCAMHead:
     """Shared-covariance FeCAM classifier over frozen features."""
 
-    def __init__(self, feature_dim: int, max_classes: int = 256):
+    def __init__(self, feature_dim: int, max_classes: int = 256,
+                 pooling: str = DEFAULT_POOLING):
+        if pooling not in POOLINGS:
+            raise ValueError(f"unknown pooling {pooling!r}, expected one of {sorted(POOLINGS)}")
         self.feature_dim = int(feature_dim)
         self.max_classes = int(max_classes)
+        # Only used by window_to_embedding: callers that pool externally and hand
+        # over (N, feature_dim) vectors are unaffected by this setting.
+        self.pooling = pooling
         self.means = np.zeros((max_classes, feature_dim), dtype=np.float64)
         self.counts = np.zeros(max_classes, dtype=np.int64)
         self._cov_sum = np.zeros((feature_dim, feature_dim), dtype=np.float64)
@@ -54,13 +103,21 @@ class FeCAMHead:
         X = _tukey(X)
         return X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-12)
 
-    @staticmethod
-    def window_to_embedding(window: np.ndarray) -> np.ndarray:
-        """(T, D) frame features -> (D,) video embedding (mean-pool)."""
+    def window_to_embedding(self, window: np.ndarray) -> np.ndarray:
+        """(T, D) frame features -> one (feature_dim,) window embedding.
+
+        Uses this head's `pooling`, so enrollment and prediction can never
+        disagree about it -- both go through here.
+        """
         w = np.asarray(window, dtype=np.float64)
         if w.ndim == 3:            # (1, T, D)
             w = w[0]
-        return w.mean(axis=0)
+        emb = POOLINGS[self.pooling](w)
+        if emb.shape[0] != self.feature_dim:
+            raise ValueError(
+                f"pooling {self.pooling!r} on {w.shape} frames gives dim "
+                f"{emb.shape[0]}, but this head expects {self.feature_dim}")
+        return emb
 
     # ── fitting / enrollment ─────────────────────────────────────────────────
     def observe(self, X: np.ndarray, y: np.ndarray, update_cov: bool = True):
@@ -201,18 +258,40 @@ class FeCAMHead:
         return int((self.counts > 0).sum())
 
     def save(self, path: str | Path):
+        """Stores the covariance as a float32 upper triangle: 52 MB -> 13 MB at
+        D=2560, which matters once a checkpoint is committed and shipped.
+
+        Lossless in effect, for two reasons. The matrix is exactly symmetric
+        (a sum of D'D outer products), so the triangle loses nothing. And the
+        float32 rounding is ~1e-7 relative on entries that `_cov_terms` then
+        regularizes by adding the full mean diagonal to the diagonal (SHRINK_1)
+        -- the shrinkage dwarfs the rounding. Verified on the 48-class val set:
+        identical accuracy, 100% argmax agreement.
+        """
+        iu = np.triu_indices(self.feature_dim)
         np.savez_compressed(
             path, feature_dim=self.feature_dim, max_classes=self.max_classes,
             means=self.means, counts=self.counts,
-            cov_sum=self._cov_sum, cov_n=self._cov_n,
+            cov_tri=self._cov_sum[iu].astype(np.float32),
+            cov_n=self._cov_n, pooling=self.pooling,
         )
 
     @classmethod
     def load(cls, path: str | Path) -> "FeCAMHead":
         z = np.load(path)
-        head = cls(int(z["feature_dim"]), int(z["max_classes"]))
+        # Checkpoints written before pooling was configurable are mean-pooled.
+        # Honouring that keeps them servable instead of silently mixing poolings.
+        pooling = str(z["pooling"]) if "pooling" in z.files else "mean"
+        head = cls(int(z["feature_dim"]), int(z["max_classes"]), pooling=pooling)
         head.means = z["means"]
         head.counts = z["counts"]
-        head._cov_sum = z["cov_sum"]
+        if "cov_tri" in z.files:
+            d = head.feature_dim
+            cov = np.zeros((d, d), dtype=np.float64)
+            iu = np.triu_indices(d)
+            cov[iu] = z["cov_tri"]
+            head._cov_sum = cov + np.triu(cov, 1).T      # mirror, diagonal once
+        else:
+            head._cov_sum = z["cov_sum"]                 # legacy full matrix
         head._cov_n = int(z["cov_n"])
         return head

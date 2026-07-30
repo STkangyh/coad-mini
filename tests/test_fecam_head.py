@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from src.models.fecam_head import FeCAMHead
+from src.models.fecam_head import FeCAMHead, pooled_dim
 
 D = 64
 RNG = np.random.default_rng(0)
@@ -57,7 +57,7 @@ def test_streaming_observe_matches_batch():
 def test_enroll_class_is_isolated_and_instant():
     """Enrolling a new class must not move existing class statistics at all."""
     X, y, protos = make_clusters()
-    h = FeCAMHead(D, 16)
+    h = FeCAMHead(D, 16, pooling="mean")   # windows are (T, D): mean keeps dim
     h.observe(X, y)
     means_before = h.means.copy(); cov_before = h._cov_sum.copy()
 
@@ -76,7 +76,7 @@ def test_enroll_class_is_isolated_and_instant():
 
 def test_remove_classes_reverts():
     X, y, _ = make_clusters()
-    h = FeCAMHead(D, 16)
+    h = FeCAMHead(D, 16, pooling="mean")
     h.observe(X, y)
     h.enroll_class(9, [RNG.standard_normal((16, D))])
     h.remove_classes([9])
@@ -98,7 +98,7 @@ def test_save_load_roundtrip(tmp_path):
 
 def test_predict_window_accepts_1xTxD():
     X, y, _ = make_clusters()
-    h = FeCAMHead(D, 16)
+    h = FeCAMHead(D, 16, pooling="mean")
     h.observe(X, y)
     w = RNG.standard_normal((1, 16, D))   # torch-style (1, T, D)
     top1, prob, s = h.predict_window(w)
@@ -128,6 +128,92 @@ def test_scores_match_per_class_mahalanobis_reference():
 
     np.testing.assert_allclose(got[:, active], want[:, active], rtol=1e-9, atol=1e-9)
     assert np.array_equal(got.argmax(axis=1), want.argmax(axis=1))
+
+
+def test_chunks3_pooling_is_order_sensitive_and_mean_is_not():
+    """The whole point of the default pooling: reversing a window must change it.
+
+    SSv2's confusable pairs ("push left-to-right" vs "right-to-left") are the same
+    frames in the opposite order, so an order-blind pooling cannot separate them.
+    """
+    w = RNG.standard_normal((16, D))
+    mean_h = FeCAMHead(D, 4, pooling="mean")
+    chunk_h = FeCAMHead(pooled_dim(D), 4, pooling="chunks3_adjdiff")
+
+    np.testing.assert_allclose(mean_h.window_to_embedding(w),
+                               mean_h.window_to_embedding(w[::-1]), atol=1e-12)
+    assert not np.allclose(chunk_h.window_to_embedding(w),
+                           chunk_h.window_to_embedding(w[::-1]))
+
+    # Reversal negates the segment differences exactly, but only when the three
+    # segments are the same length -- at T=16 they are 5/5/6, so use T=15 here.
+    w15 = RNG.standard_normal((15, D))
+    fwd = chunk_h.window_to_embedding(w15)
+    rev = chunk_h.window_to_embedding(w15[::-1])
+    np.testing.assert_allclose(fwd[3 * D:4 * D], -rev[4 * D:5 * D], atol=1e-12)
+    np.testing.assert_allclose(fwd[4 * D:5 * D], -rev[3 * D:4 * D], atol=1e-12)
+
+
+def test_chunks3_head_enrolls_and_predicts_from_windows():
+    """End-to-end on the deployed default: (T, D) windows in, right class out."""
+    h = FeCAMHead(pooled_dim(D), 8)
+    assert h.pooling == "chunks3_adjdiff" and h.feature_dim == 5 * D
+
+    base = RNG.standard_normal((16, D))
+    for c in range(3):
+        proto = base + 3.0 * RNG.standard_normal((16, D))
+        h.observe(np.stack([h.window_to_embedding(proto + 0.05 * RNG.standard_normal((16, D)))
+                            for _ in range(20)]), np.full(20, c))
+        if c == 0:
+            target = proto
+    top1, prob, _ = h.predict_window(target)
+    assert top1 == 0 and 0.0 < prob <= 1.0
+
+
+def test_short_windows_do_not_produce_nans():
+    """A window shorter than 3 frames still has to yield a usable embedding."""
+    h = FeCAMHead(pooled_dim(D), 4)
+    for t in (1, 2, 3):
+        emb = h.window_to_embedding(RNG.standard_normal((t, D)))
+        assert emb.shape == (5 * D,) and np.isfinite(emb).all()
+
+
+def test_save_load_preserves_pooling_and_is_lossless(tmp_path):
+    """The checkpoint carries its pooling, and the float32 triangle costs nothing."""
+    h = FeCAMHead(pooled_dim(D), 8)
+    X = RNG.standard_normal((120, 5 * D))
+    h.observe(X, np.repeat(np.arange(4), 30))
+    p = tmp_path / "head.npz"
+    h.save(p)
+    h2 = FeCAMHead.load(p)
+
+    assert h2.pooling == "chunks3_adjdiff" and h2.feature_dim == 5 * D
+    np.testing.assert_array_equal(h2._cov_sum, h2._cov_sum.T)   # symmetry restored
+    Xq = RNG.standard_normal((10, 5 * D))
+    np.testing.assert_array_equal(h.scores(Xq).argmax(axis=1),
+                                  h2.scores(Xq).argmax(axis=1))
+    np.testing.assert_allclose(h.scores(Xq), h2.scores(Xq), rtol=1e-5)
+
+
+def test_legacy_checkpoint_without_pooling_loads_as_mean(tmp_path):
+    """Checkpoints predating the pooling field must stay servable, not crash."""
+    h = FeCAMHead(D, 8, pooling="mean")
+    h.observe(*make_clusters(n_classes=3, n_per=30)[:2])
+    p = tmp_path / "legacy.npz"
+    np.savez_compressed(p, feature_dim=D, max_classes=8, means=h.means,
+                        counts=h.counts, cov_sum=h._cov_sum, cov_n=h._cov_n)
+    loaded = FeCAMHead.load(p)
+    assert loaded.pooling == "mean" and loaded.feature_dim == D
+
+    Xq = RNG.standard_normal((5, D))
+    np.testing.assert_allclose(loaded.scores(Xq), h.scores(Xq), atol=1e-9)
+    # and it still pools windows the way it was fitted
+    assert loaded.window_to_embedding(RNG.standard_normal((16, D))).shape == (D,)
+
+
+def test_unknown_pooling_is_rejected():
+    with pytest.raises(ValueError, match="unknown pooling"):
+        FeCAMHead(D, 4, pooling="bogus")
 
 
 def test_enrollment_reuses_the_precision_matrix():

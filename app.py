@@ -258,14 +258,15 @@ def _load_fecam():
 
 _fecam_head = _load_fecam()
 if _fecam_head is not None:
-    print(f"✓ FeCAM head loaded (n_classes={_fecam_head.n_classes})")
+    print(f"✓ FeCAM head loaded (n_classes={_fecam_head.n_classes}, "
+          f"pooling={_fecam_head.pooling}, dim={_fecam_head.feature_dim})")
 else:
     print("⚠ FeCAM head not found — run dev/build_fecam_head.py (demo works without it)")
 
 
 def fecam_predict(feat: torch.Tensor, top_k: int = 5):
     """(1, T, D) feature window -> top-k results in the same format as predict()."""
-    emb = FeCAMHead.window_to_embedding(feat.cpu().numpy())
+    emb = _fecam_head.window_to_embedding(feat.cpu().numpy())
     s = _fecam_head.scores(emb[None, :])[0]
     active = _fecam_head.counts > 0
     e = np.exp((s - s[active].max()) * 0.5)
@@ -359,6 +360,7 @@ def health():
         "device": device,
         "fecam_ready": _fecam_head is not None,
         "fecam_n_classes": _fecam_head.n_classes if _fecam_head else 0,
+        "fecam_pooling": _fecam_head.pooling if _fecam_head else None,
     }
 
 
