@@ -41,7 +41,10 @@ class FeCAMHead:
         self.counts = np.zeros(max_classes, dtype=np.int64)
         self._cov_sum = np.zeros((feature_dim, feature_dim), dtype=np.float64)
         self._cov_n = 0
-        self._cache = None          # (precision, sd) cache, invalidated on update
+        # Two caches with different invalidation rules -- see `_precision`.
+        self._cov_cache = None      # (precision, sd): depends only on the covariance
+        self._mean_cache = None     # (active, mu, mu_prec, mu_quad): also on the means
+        self._dirty: set[int] = set()   # classes whose mean moved since _mean_cache
 
     # ── feature prep ─────────────────────────────────────────────────────────
     def _prep(self, X: np.ndarray) -> np.ndarray:
@@ -68,7 +71,8 @@ class FeCAMHead:
         """
         X = self._prep(X)
         y = np.asarray(y, dtype=np.int64)
-        for c in np.unique(y):
+        touched = np.unique(y)
+        for c in touched:
             m = X[y == c]
             tot = self.counts[c] + len(m)
             self.means[c] = (self.means[c] * self.counts[c] + m.sum(axis=0)) / tot
@@ -77,7 +81,9 @@ class FeCAMHead:
             D = X - self.means[y]
             self._cov_sum += D.T @ D
             self._cov_n += len(X)
-        self._cache = None
+            self._cov_cache = None      # precision changed -> everything downstream did
+            self._mean_cache = None
+        self._dirty.update(int(c) for c in touched)
 
     def enroll_class(self, class_id: int, windows: list[np.ndarray]) -> int:
         """Instant few-shot enrollment: one mean from a few (T, D) windows.
@@ -93,17 +99,15 @@ class FeCAMHead:
         for c in class_ids:
             self.means[c] = 0.0
             self.counts[c] = 0
-        self._cache = None
+        # The shared covariance keeps whatever those classes contributed, so the
+        # precision is still valid; only the per-class terms must be rebuilt.
+        self._mean_cache = None
+        self._dirty.clear()
 
     # ── scoring ──────────────────────────────────────────────────────────────
-    def _precision(self):
-        """Cached (precision, sd, active, scaled means, means@prec, m'Pm).
-
-        The mean-dependent terms are cached alongside the precision because the
-        scoring path expands the Mahalanobis quadratic form (see `scores`); all
-        of it is invalidated together whenever statistics change.
-        """
-        if self._cache is None:
+    def _cov_terms(self):
+        """Cached (precision, sd). Depends ONLY on the shared covariance."""
+        if self._cov_cache is None:
             d = self.feature_dim
             cov = self._cov_sum / max(self._cov_n, 1)
             diag_mean = float(np.trace(cov)) / d
@@ -112,13 +116,47 @@ class FeCAMHead:
             cov = cov + SHRINK_1 * diag_mean * np.eye(d) + SHRINK_2 * off_mean * (1 - np.eye(d))
             sd = np.sqrt(np.diag(cov))
             corr = cov / np.outer(sd, sd)
-            prec = np.linalg.inv(corr)
-            active = np.where(self.counts > 0)[0]
-            mu = self.means[active] / sd                      # (K, D)
-            mu_prec = mu @ prec                               # (K, D)
-            mu_quad = np.einsum("kd,kd->k", mu_prec, mu)      # (K,)  m' P m
-            self._cache = (prec, sd, active, mu, mu_prec, mu_quad)
-        return self._cache
+            self._cov_cache = (np.linalg.inv(corr), sd)
+        return self._cov_cache
+
+    def _precision(self):
+        """Cached (precision, sd, active, scaled means, means@prec, m'Pm).
+
+        Split into two caches because they are invalidated by different things.
+        Enrolling a class (`update_cov=False`) moves one mean but leaves the
+        covariance alone, so the D x D inverse -- by far the dominant term --
+        stays valid and only that class's row of the mean-dependent terms has to
+        be recomputed: O(D^2) instead of O(D^3).
+
+        That distinction is what makes train-while-predicting affordable. In a
+        streaming loop the head learns and scores on the same frame, so a full
+        invalidation would pay the inverse EVERY frame: 8 ms at D=512, but 318 ms
+        at the D=2560 of the chunks3+adjdiff pooling -- past the 100 ms budget of
+        a 10 fps loop on its own. See reports/realtime_incremental_result.md.
+        """
+        prec, sd = self._cov_terms()
+        active_now = np.where(self.counts > 0)[0]
+
+        if self._mean_cache is not None:
+            active, mu, mu_prec, mu_quad = self._mean_cache
+            if np.array_equal(active, active_now):
+                if self._dirty:
+                    # Same classes, some means moved -> patch just those rows.
+                    ids = np.fromiter(sorted(self._dirty), dtype=np.int64)
+                    rows = np.searchsorted(active, ids)
+                    mu[rows] = self.means[ids] / sd
+                    mu_prec[rows] = mu[rows] @ prec
+                    mu_quad[rows] = np.einsum("kd,kd->k", mu_prec[rows], mu[rows])
+                    self._dirty.clear()
+                return (prec, sd, active, mu, mu_prec, mu_quad)
+
+        active = active_now
+        mu = self.means[active] / sd                      # (K, D), a fresh copy
+        mu_prec = mu @ prec                               # (K, D)
+        mu_quad = np.einsum("kd,kd->k", mu_prec, mu)      # (K,)  m' P m
+        self._mean_cache = (active, mu, mu_prec, mu_quad)
+        self._dirty.clear()
+        return (prec, sd, active, mu, mu_prec, mu_quad)
 
     def scores(self, X: np.ndarray) -> np.ndarray:
         """(N, D) raw embeddings -> (N, max_classes) scores (higher = better).

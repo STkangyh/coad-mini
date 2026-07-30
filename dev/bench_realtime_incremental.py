@@ -13,13 +13,26 @@ Two modes are timed so the marginal cost of learning is isolated:
   predict-only   encode -> pool -> scores
   learn+predict  encode -> pool -> observe -> scores      <- the goal's question
 
-The learn+predict mode has a non-obvious cost: FeCAM.observe() sets _cache = None
-(fecam_head.py:80), so the next scores() must rebuild the DxD correlation inverse.
-In a steady train-then-predict loop that inverse is paid EVERY frame, which never
-happens in the batch experiments where we fit once and score many times. This
-script measures that term explicitly rather than assuming it is negligible.
+The learn+predict mode has a non-obvious cost: observe() invalidates the cached
+DxD correlation inverse, so the next scores() must rebuild it. In a steady
+train-then-predict loop that inverse is paid EVERY frame, which never happens in
+the batch experiments where we fit once and score many times. This script
+measures that term explicitly rather than assuming it is negligible -- it turned
+out to dominate the learning path, which is what motivated splitting the head's
+cache in two (fecam_head.py::_precision).
+
+Two learning modes are separated because only one of them is now cheap:
+  enroll (update_cov=False)  the demo's path -- means move, covariance does not,
+                             so the inverse survives and only one row is patched
+  full   (update_cov=True)   also folds the window into the shared covariance,
+                             which genuinely requires a new inverse
+
+--dim-sweep re-times the head across the pooling dimensions we actually use,
+because the inverse is O(D^3): the chunks3+adjdiff pooling that won +9.0pp on
+SSv2 has D=2560, where a full update costs far more than the whole frame budget.
 
 Run: python3 dev/bench_realtime_incremental.py [--frames 60] [--classes 48]
+     python3 dev/bench_realtime_incremental.py --dim-sweep
 """
 import argparse
 import json
@@ -55,12 +68,162 @@ def timed(fn, n, warmup=3):
             "p95": ts[int(len(ts) * 0.95)] if len(ts) > 1 else ts[0]}
 
 
+POOLINGS = [("mean (deployed)", 512), ("halves", 1024), ("thirds", 1536),
+            ("chunks3+adjdiff (best SSv2)", 2560)]
+
+
+def warm_head(dim, n_classes, rng):
+    head = FeCAMHead(feature_dim=dim, max_classes=n_classes)
+    head.observe(rng.standard_normal((n_classes * 40, dim)),
+                 np.repeat(np.arange(n_classes), 40))
+    head.scores(rng.standard_normal((1, dim)))      # warm both caches
+    return head
+
+
+def dim_sweep(n_classes):
+    """Head-only cost vs feature dimension. The encoder is dimension-independent,
+    so this isolates what changing the pooling does to the real-time budget."""
+    rng = np.random.default_rng(0)
+    print(f"head-only, {n_classes} classes, budget {BUDGET_MS:.0f} ms/frame "
+          f"(encoder adds a constant ~27 ms)\n")
+    print(f"{'pooling':30s} {'D':>5s} {'predict':>9s} {'+enroll':>9s} {'+full':>9s}")
+    print("-" * 66)
+    rows = {}
+    for name, dim in POOLINGS:
+        head = warm_head(dim, n_classes, rng)
+        e = rng.standard_normal((1, dim))
+
+        def predict():
+            head.scores(e)
+
+        def enroll():
+            head.observe(e, np.array([0]), update_cov=False)
+            head.scores(e)
+
+        def full():
+            head.observe(e, np.array([0]))
+            head.scores(e)
+
+        r = {"predict": timed(predict, 10)["mean"], "enroll": timed(enroll, 10)["mean"],
+             "full": timed(full, 5)["mean"]}
+        rows[name] = {**r, "dim": dim}
+        print(f"{name:30s} {dim:5d} {r['predict']:8.2f}ms {r['enroll']:8.2f}ms "
+              f"{r['full']:8.1f}ms")
+    out = ROOT / "reports/realtime_dim_sweep_raw.json"
+    out.write_text(json.dumps(rows, indent=2))
+    print(f"\nraw -> {out}")
+
+
+def class_sweep(dim=DIM, counts=(48, 101, 250, 500)):
+    """Does the number of enrolled classes threaten the frame budget?
+
+    Scoring is O(K*D) and the inverse is O(D^3) -- independent of K -- so the
+    expectation is "no". Pinned here because a product keeps enrolling classes.
+    """
+    rng = np.random.default_rng(0)
+    print(f"head-only, D={dim}, budget {BUDGET_MS:.0f} ms/frame\n")
+    print(f"{'classes':>8s} {'predict':>9s} {'+enroll':>9s} {'+full':>9s}")
+    print("-" * 40)
+    rows = {}
+    for k in counts:
+        head = warm_head(dim, k, rng)
+        e = rng.standard_normal((1, dim))
+        r = {
+            "predict": timed(lambda: head.scores(e), 10)["mean"],
+            "enroll": timed(lambda: (head.observe(e, np.array([0]), update_cov=False),
+                                     head.scores(e)), 10)["mean"],
+            "full": timed(lambda: (head.observe(e, np.array([0])), head.scores(e)), 5)["mean"],
+        }
+        rows[k] = r
+        print(f"{k:8d} {r['predict']:8.2f}ms {r['enroll']:8.2f}ms {r['full']:8.2f}ms")
+    out = ROOT / "reports/realtime_class_sweep_raw.json"
+    out.write_text(json.dumps(rows, indent=2))
+    print(f"\nraw -> {out}")
+
+
+UCF_DIR = ROOT / "data/features_ucf101_b32"
+
+
+def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0)):
+    """Accuracy vs how often the covariance inverse is refreshed.
+
+    The enroll path no longer needs the inverse at all, but a full update
+    genuinely changes the covariance, and at D>=1536 refreshing it every frame
+    does not fit the budget (see --dim-sweep). So: how stale can the inverse get
+    before accuracy suffers?
+
+    Prequential (test-then-train) on real UCF101 features, mean-pooled, streamed
+    one sample at a time. `period=0` means never refresh after the warm start.
+    """
+    man = json.loads((UCF_DIR / "manifest.json").read_text())
+    samples = man["splits"]["train"]["samples"]
+    rng = np.random.default_rng(0)
+    rng.shuffle(samples)
+
+    need = warm + stream
+    X, y = [], []
+    for s in samples[:need]:
+        p = UCF_DIR / "train" / f"{s['id']}.npy"
+        if p.exists():
+            X.append(np.load(p).mean(axis=0))
+            y.append(s["class_id"])
+    X = np.stack(X).astype(np.float64)
+    y = np.array(y)
+    warm = min(warm, len(X) - 100)
+    print(f"UCF101 real features | warm start {warm}, then stream {len(X)-warm} "
+          f"one at a time (predict, then learn)\n")
+    print(f"{'covariance refresh':22s} {'accuracy':>9s} {'head ms/frame':>14s} {'head fps':>9s}")
+    print("-" * 60)
+
+    rows = {}
+    for period in periods:
+        head = FeCAMHead(feature_dim=DIM, max_classes=101)
+        head.observe(X[:warm], y[:warm])
+        head.scores(X[:1])
+        correct, t0 = 0, time.perf_counter()
+        for i in range(warm, len(X)):
+            xi = X[i:i + 1]
+            correct += int(head.scores(xi).argmax() == y[i])
+            saved = head._cov_cache
+            head.observe(xi, y[i:i + 1])        # accumulates the covariance
+            # Not a refresh step: keep using the previous inverse. The means are
+            # still patched exactly -- only the D x D term goes stale.
+            if period == 0 or (i - warm + 1) % period:
+                head._cov_cache = saved
+        dt = (time.perf_counter() - t0) / (len(X) - warm) * 1000
+        acc = correct / (len(X) - warm)
+        label = "every frame" if period == 1 else ("never" if period == 0
+                                                   else f"every {period}")
+        rows[label] = {"accuracy": acc, "ms_per_frame": dt}
+        print(f"{label:22s} {100*acc:8.2f}% {dt:13.2f}ms {1000/dt:8.0f}")
+
+    out = ROOT / "reports/realtime_stream_sim_raw.json"
+    out.write_text(json.dumps(rows, indent=2))
+    print(f"\nraw -> {out}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--frames", type=int, default=40, help="frames to simulate")
     ap.add_argument("--classes", type=int, default=48)
     ap.add_argument("--device", default="cpu", help="cpu is the edge-relevant case")
+    ap.add_argument("--dim-sweep", action="store_true",
+                    help="head-only timings across the poolings we use")
+    ap.add_argument("--stream-sim", action="store_true",
+                    help="accuracy vs covariance-refresh period on real UCF101")
+    ap.add_argument("--class-sweep", action="store_true",
+                    help="head cost vs number of enrolled classes")
     args = ap.parse_args()
+
+    if args.dim_sweep:
+        dim_sweep(args.classes)
+        return
+    if args.stream_sim:
+        stream_sim()
+        return
+    if args.class_sweep:
+        class_sweep()
+        return
 
     from transformers import AutoModel, AutoProcessor
     dev = args.device
@@ -72,11 +235,7 @@ def main():
     frame = Image.fromarray(rng.integers(0, 255, (240, 320, 3), dtype=np.uint8))
 
     # a warm head with `classes` enrolled, as a deployed demo would have
-    head = FeCAMHead(feature_dim=DIM, max_classes=args.classes)
-    X = rng.standard_normal((args.classes * 40, DIM))
-    y = np.repeat(np.arange(args.classes), 40)
-    head.observe(X, y)
-    head.scores(X[:1])                      # warm the precision cache
+    head = warm_head(DIM, args.classes, rng)
 
     ring = rng.standard_normal((N_FRAMES, DIM))
 
@@ -99,34 +258,41 @@ def main():
 
     emb = pool()[None, :]
 
-    # ── stage 4: incremental learn (one window) ─────────────────────────────
-    def observe():
+    # ── stage 4: incremental learn, one window, both modes ──────────────────
+    def enroll():                       # means only -- the demo's path
+        head.observe(emb, np.array([0]), update_cov=False)
+
+    def learn_full():                   # also updates the shared covariance
         head.observe(emb, np.array([0]))
 
-    # ── stage 5: predict (cache warm) ───────────────────────────────────────
-    def scores_warm():
-        head._cache is None and head._precision()
+    # ── stage 5: predict ────────────────────────────────────────────────────
+    def scores_clean():                 # no update pending: both caches valid
         return head.scores(emb)
 
-    # ── stage 5b: predict right after an update (cache invalidated) ─────────
-    def scores_cold():
-        head._cache = None
+    def scores_after_enroll():          # one mean row to patch
+        head.observe(emb, np.array([0]), update_cov=False)
         return head.scores(emb)
 
-    # ── stage 5c: just the cache rebuild (the DxD inverse) ──────────────────
-    def rebuild_cache():
-        head._cache = None
-        head._precision()
+    def scores_after_full():            # covariance moved: new DxD inverse
+        head.observe(emb, np.array([0]))
+        return head.scores(emb)
+
+    # ── stage 5c: the DxD inverse alone ─────────────────────────────────────
+    def rebuild_inverse():
+        head._cov_cache = None
+        head._cov_terms()
 
     n = max(args.frames, 10)
     stages = {
         "1. preprocess (PIL->tensor)": timed(preprocess, n),
         "2. CLIP encode (batch=1)": timed(encode, n),
         "3. ring-buffer mean-pool": timed(pool, n),
-        "4. FeCAM observe (learn)": timed(observe, n),
-        "5. FeCAM scores (cache warm)": timed(scores_warm, n),
-        "5b. FeCAM scores (cache cold)": timed(scores_cold, n),
-        "5c. -- of which: cache rebuild": timed(rebuild_cache, n),
+        "4a. FeCAM observe (enroll)": timed(enroll, n),
+        "4b. FeCAM observe (full)": timed(learn_full, n),
+        "5. FeCAM scores (no update)": timed(scores_clean, n),
+        "5a. observe(enroll) + scores": timed(scores_after_enroll, n),
+        "5b. observe(full) + scores": timed(scores_after_full, n),
+        "5c. -- DxD inverse alone": timed(rebuild_inverse, n),
     }
 
     print(f"{'stage':34s} {'mean':>9s} {'p50':>9s} {'p95':>9s}  {'% budget':>9s}")
@@ -138,34 +304,39 @@ def main():
     pre = stages["1. preprocess (PIL->tensor)"]["mean"]
     enc = stages["2. CLIP encode (batch=1)"]["mean"]
     pl = stages["3. ring-buffer mean-pool"]["mean"]
-    obs = stages["4. FeCAM observe (learn)"]["mean"]
-    sc_warm = stages["5. FeCAM scores (cache warm)"]["mean"]
-    sc_cold = stages["5b. FeCAM scores (cache cold)"]["mean"]
+    sc = stages["5. FeCAM scores (no update)"]["mean"]
+    head_enroll = stages["5a. observe(enroll) + scores"]["mean"]
+    head_full = stages["5b. observe(full) + scores"]["mean"]
 
-    predict_only = pre + enc + pl + sc_warm
-    learn_predict = pre + enc + pl + obs + sc_cold
-    head_only = obs + sc_cold
+    front = pre + enc + pl                  # everything before the head
+    predict_only = front + sc
+    learn_enroll = front + head_enroll
+    learn_full_e2e = front + head_full
 
     print(f"\n{'end-to-end per frame':34s} {'total':>9s} {'fps':>9s}  {'verdict':>9s}")
     print("-" * 78)
     for name, tot in (("predict only", predict_only),
-                      ("learn + predict (incremental)", learn_predict)):
-        fps = 1000.0 / tot
+                      ("learn (enroll) + predict", learn_enroll),
+                      ("learn (full cov) + predict", learn_full_e2e)):
         ok = "OK" if tot <= BUDGET_MS else "OVER"
-        print(f"{name:34s} {tot:8.2f}ms {fps:8.1f} {ok:>9s}")
+        print(f"{name:34s} {tot:8.2f}ms {1000.0/tot:8.1f} {ok:>9s}")
 
-    print(f"\nmarginal cost of learning: {learn_predict - predict_only:.2f} ms/frame "
-          f"({100*(learn_predict-predict_only)/BUDGET_MS:.1f}% of budget)")
-    print(f"encoder share of learn+predict: {100*enc/learn_predict:.1f}%")
-    print(f"head share (observe+scores):    {100*head_only/learn_predict:.1f}%")
+    print(f"\nmarginal cost of learning (enroll): {learn_enroll - predict_only:.2f} ms/frame "
+          f"({100*(learn_enroll-predict_only)/BUDGET_MS:.1f}% of budget)")
+    print(f"marginal cost of learning (full):   {learn_full_e2e - predict_only:.2f} ms/frame "
+          f"({100*(learn_full_e2e-predict_only)/BUDGET_MS:.1f}% of budget)")
+    print(f"encoder share of learn(enroll)+predict: {100*enc/learn_enroll:.1f}%")
+    print(f"head share (observe+scores):            {100*head_enroll/learn_enroll:.1f}%")
+    print(f"\nheadroom at 10 fps: {BUDGET_MS - learn_enroll:.1f} ms/frame")
 
     out = ROOT / "reports/realtime_incremental_raw.json"
     out.write_text(json.dumps({
         "device": dev, "budget_ms": BUDGET_MS, "n_classes": args.classes,
-        "stages_ms": stages,
-        "predict_only_ms": predict_only, "learn_predict_ms": learn_predict,
-        "encoder_share_pct": 100 * enc / learn_predict,
-        "head_share_pct": 100 * head_only / learn_predict,
+        "dim": DIM, "stages_ms": stages,
+        "predict_only_ms": predict_only, "learn_enroll_ms": learn_enroll,
+        "learn_full_ms": learn_full_e2e,
+        "encoder_share_pct": 100 * enc / learn_enroll,
+        "head_share_pct": 100 * head_enroll / learn_enroll,
     }, indent=2))
     print(f"\nraw -> {out}")
 

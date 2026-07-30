@@ -1,0 +1,22 @@
+{
+  "every frame": {
+    "accuracy": 0.935,
+    "ms_per_frame": 11.150651718489826
+  },
+  "every 5": {
+    "accuracy": 0.935,
+    "ms_per_frame": 3.500645468593575
+  },
+  "every 20": {
+    "accuracy": 0.935,
+    "ms_per_frame": 2.0128882286371663
+  },
+  "every 100": {
+    "accuracy": 0.935,
+    "ms_per_frame": 1.707934896403458
+  },
+  "never": {
+    "accuracy": 0.9325,
+    "ms_per_frame": 1.497941666166298
+  }
+}

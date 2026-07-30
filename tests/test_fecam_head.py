@@ -130,6 +130,59 @@ def test_scores_match_per_class_mahalanobis_reference():
     assert np.array_equal(got.argmax(axis=1), want.argmax(axis=1))
 
 
+def test_enrollment_reuses_the_precision_matrix():
+    """Enrolling must not recompute the D x D inverse.
+
+    update_cov=False leaves the shared covariance untouched, so the precision is
+    still correct; rebuilding it anyway cost 315 ms per enrolled window at
+    D=2560, which alone blows a 10 fps budget (see
+    reports/realtime_incremental_result.md). Identity, not equality: an equal but
+    freshly-inverted matrix would mean the work was still done.
+    """
+    X, y, _ = make_clusters(n_classes=4, n_per=30)
+    h = FeCAMHead(feature_dim=D, max_classes=16)
+    h.observe(X, y)
+    prec_before, sd_before = h._cov_terms()
+
+    h.observe(RNG.standard_normal((3, D)), np.full(3, 9), update_cov=False)
+    h.scores(X[:2])
+    prec_after, sd_after = h._cov_terms()
+
+    assert prec_after is prec_before and sd_after is sd_before
+
+    h.observe(RNG.standard_normal((3, D)), np.full(3, 9))    # update_cov=True
+    assert h._cov_terms()[0] is not prec_before, "a covariance update must rebuild"
+
+
+def test_incremental_cache_matches_full_rebuild():
+    """Patching single rows of the mean-dependent cache must be exact.
+
+    Interleaves enrollments, covariance updates and removals against a head that
+    is forced to rebuild everything from scratch before each scoring call.
+    """
+    X, y, _ = make_clusters(n_classes=5, n_per=30)
+    inc = FeCAMHead(feature_dim=D, max_classes=16)
+    ref = FeCAMHead(feature_dim=D, max_classes=16)
+    for h in (inc, ref):
+        h.observe(X, y)
+
+    for step in range(12):
+        new = RNG.standard_normal((2, D))
+        cid = step % 8
+        for h in (inc, ref):
+            if step % 4 == 3:
+                h.observe(new, np.full(2, cid))          # covariance moves too
+            else:
+                h.observe(new, np.full(2, cid), update_cov=False)
+        if step == 7:
+            for h in (inc, ref):
+                h.remove_classes([1])
+
+        ref._cov_cache = ref._mean_cache = None          # force a full rebuild
+        ref._dirty.clear()
+        np.testing.assert_array_equal(inc.scores(X[:6]), ref.scores(X[:6]))
+
+
 def test_scores_cache_invalidated_by_new_enrollment():
     """The cached mean-dependent terms must not survive a statistics update."""
     X, y, _ = make_clusters(n_classes=3, n_per=30)
