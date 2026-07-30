@@ -350,6 +350,38 @@ GRU+A-GEM은 base 세션 직후 붕괴하는 메커니즘까지 확인(고정 me
 | mean | 512 | 8.43 ms | 0.32 ms (27×) |
 | **chunks3+adjdiff** | **2560** | **315 ms** (예산 3배 초과) | **1.98 ms** (159×) |
 
+## 2026-07-30 · PyCIL 시간 측정 감사 — 툴박스에도 없다
+📄 검증 대상: `external/PyCIL` @ `f3509b8`
+
+**질문:** PyCIL이 training/inference 시간을 측정하나?
+
+**답: 둘 다 아니다. 전 코드베이스에 `import time`이 한 줄도 없다.**
+
+`time.time` · `perf_counter` · `timeit` · `elapsed` · `duration` · `latency` · `throughput`
+전수 검색 결과 **0건**. 실행 로그 파일에서도 시간 관련 줄 0개.
+
+| PyCIL이 재는 것 | PyCIL이 안 재는 것 |
+|---|---|
+| top1 / top5 정확도, grouped, 곡선 | **학습 시간** |
+| Average Incremental Accuracy | **추론 시간 / latency / throughput** |
+| Forgetting | **FLOPs** |
+| 파라미터 수 (`count_parameters`) | **메모리(RAM/VRAM)** |
+
+유일한 예외는 `tqdm` 진행바가 stderr에 경과시간을 띄우는 것뿐 — **기록도 보고도 되지 않는다.**
+
+**왜 중요한가 — 7/25 서베이 감사와 정확히 같은 그림이고, 같은 그룹이다.**
+PyCIL 저자는 Zhou Da-Wei · Wang Fu-Yun · Ye Han-Jia · Zhan De-Chuan (SCIS'23)이고,
+우리가 7/25에 "CPU 0회, FLOPs 0회"를 확인한 그 서베이(TPAMI'24, Zhou Da-Wei 외)는
+**PyCIL README가 직접 인용하는 같은 그룹의 논문**이다.
+
+→ **이 분야의 표준 서베이와 표준 툴박스가 둘 다 시간을 재지 않는다.** 정확도와 망각,
+그리고 (서베이의 경우) 메모리 바이트만 본다. 우리가 wall-clock과 FLOPs를 병기하는 게
+중복이 아니라 **빈칸을 채우는 것**이라는 근거가 하나 더 생겼다.
+
+**단, 과장 금지:** "아무도 시간을 안 잰다"가 아니다. 개별 논문(SparCL 등)은 잰다.
+정확한 주장은 **"표준 평가 도구가 시간을 재도록 만들어져 있지 않아, 논문 간 시간 비교가
+구조적으로 불가능하다"** 이다.
+
 ## 2026-07-30 · chunks3+adjdiff를 기본값으로 배포
 📄 커밋 `9e7a0a8` · Space [abed041](https://huggingface.co/spaces/Yhoon-3/coad-mini)
 
@@ -402,17 +434,38 @@ GRU+A-GEM은 base 세션 직후 붕괴하는 메커니즘까지 확인(고정 me
 
 **막힌 것**
 - **HMDB51** — 공식 split 서버가 HTML을 반환, HF 미러는 영상만. split을 지어낼 수 없어 보류.
-- **인코더 교체** — MobileCLIP은 CPU에서 20배 느림. NPU 런타임(CoreML/ONNX-RT) 없이는 해결 불가.
+- ~~**인코더 교체**~~ — MobileCLIP은 CPU에서 20배 느림. **Jetson 대여로 검증 경로가 생김**(아래).
+
+**⭐ Jetson AGX Orin 대여 가능 — 막힌 항목 2개가 동시에 풀린다**
+
+보드가 손에 들어오면 아래 두 가지가 한 번에 가능해진다. 우리 벤치
+(`dev/bench_realtime_incremental.py`)는 플랫폼 의존 코드가 없어 **그대로 돌아간다**
+(numpy/torch/PIL만 사용, `--device` 스위치 존재).
+
+1. **임베디드 절대 fps** — 지금 수치는 Apple Silicon 1대 기준이라 절대값 근거가 없다.
+   Orin의 CPU-only 모드가 우리 주장(CPU-only edge CL)에 정확히 대응하는 숫자다.
+2. **MobileCLIP 가설 검증** — 7/16·7/27 결론은 *"MobileCLIP이 느린 건 depthwise conv에
+   최적화 커널이 없어서지 모델이 나빠서가 아니다"* 였고, 이건 **NPU 타깃 런타임이 없어
+   검증 불가**였다. Orin + TensorRT가 바로 그 런타임이다. 가설이 맞으면 역전이 나와야 한다.
+3. **에너지(mJ/update)** — Orin은 `tegrastats`/INA3221 전력 레일을 노출한다. CIL 분야는
+   시간조차 안 재는 상황(위 감사)이라 **에너지를 보고하면 사실상 최초**다. 보드가 있을 때만
+   얻을 수 있는 수치이므로 대여 기간에 반드시 뽑을 것.
+
+⚠️ **프레이밍 주의:** AGX Orin은 15~60W 로봇/자율주행 모듈이지 **스마트글래스 급이 아니다.**
+우리 서사의 "로봇" 쪽은 뒷받침하지만 "AI 글래스"는 뒷받침하지 못한다. 글래스/폰 급 주장을
+하려면 별도로 폰 CPU(SparCL이 쓴 Galaxy S20 계열)나 RPi가 필요하다.
+
+📌 **대여 전 준비물:** 보드 시간을 디버깅에 쓰지 않도록, 한 번 실행하면 위 3개를 전부
+JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 
 **미실행 (우선순위 순)**
-1. **실제 임베디드 보드**(Jetson/RPi) 측정 — "병목은 인코더" 결론이 강해질 뿐이지만 절대 fps는 미지.
-2. **공분산 갱신 주기 튜닝** — D=2560에서 공분산 갱신은 325 ms(예산 초과). 평균은 매 프레임,
+1. **공분산 갱신 주기 튜닝** — D=2560에서 공분산 갱신은 325 ms(예산 초과). 평균은 매 프레임,
    역행렬은 가끔 갱신하는 운용이 자연스러운데, 주기가 정확도에 미치는 영향은 UCF101 800프레임·D=512
    한 조건에서만 확인됨.
-3. **차원 축소와 결합** — 2560-d 공분산은 크다. random projection/PCA로 줄이면 더 많은 구간을 쓸 수 있을지도.
-4. **AUC-A / AUC-L 채택** — PyCIL 서베이의 메모리-불가지론 지표.
-5. **BudgetCL 방식의 iteration-budget 프로토콜**.
-6. **학습형 temporal encoder를 선택적으로** — backprop-free 주장은 포기하되 상한 확인용.
+2. **차원 축소와 결합** — 2560-d 공분산은 크다. random projection/PCA로 줄이면 더 많은 구간을 쓸 수 있을지도.
+3. **AUC-A / AUC-L 채택** — PyCIL 서베이의 메모리-불가지론 지표.
+4. **BudgetCL 방식의 iteration-budget 프로토콜**.
+5. **학습형 temporal encoder를 선택적으로** — backprop-free 주장은 포기하되 상한 확인용.
 
 ---
 
