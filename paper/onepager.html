@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 14mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: #111; margin: 0;
+         font-size: 10.2pt; line-height: 1.42; }
+  h1 { font-size: 16pt; margin: 0 0 2px; line-height: 1.2; }
+  .sub { color: #444; font-size: 9.6pt; margin: 0 0 2px; }
+  .auth { color: #666; font-size: 9pt; margin: 0 0 10px; }
+  h2 { font-size: 10.6pt; color: #1a4d8f; margin: 11px 0 3px;
+       border-bottom: 1px solid #d8dee6; padding-bottom: 2px; }
+  p { margin: 0 0 6px; }
+  .pipe { font-family: ui-monospace, Menlo, monospace; font-size: 8.8pt; color: #333;
+          background: #f3f5f8; border: 1px solid #e1e6ec; border-radius: 4px;
+          padding: 4px 7px; display: inline-block; margin: 2px 0; }
+  .figs { display: flex; gap: 9px; margin: 5px 0 2px; }
+  .figs figure { margin: 0; flex: 1; }
+  .figs img { width: 100%; border: 1px solid #d8dee6; border-radius: 5px; display: block; }
+  figcaption { font-size: 8pt; color: #666; margin-top: 2px; text-align: center; }
+  ul { margin: 3px 0 6px; padding-left: 17px; }
+  li { margin: 1.5px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 3px 0 4px; }
+  th, td { border: 1px solid #dde3ea; padding: 2.5px 6px; text-align: left; }
+  th { background: #f3f5f8; }
+  .pos { color: #1a7f37; font-weight: 600; }
+  .neg { color: #cf222e; font-weight: 600; }
+  .key { background: #eef6ff; border-left: 3px solid #1a4d8f; padding: 6px 9px;
+         border-radius: 3px; margin: 4px 0 2px; }
+  .foot { margin-top: 9px; padding-top: 5px; border-top: 1px solid #d8dee6;
+          font-size: 8.4pt; color: #555; }
+  a { color: #1a4d8f; text-decoration: none; }
+</style>
+</head>
+<body>
+
+  <h1>Data, Not Architecture: An Empirical Study of Replay-Based<br>Continual Learning for Video Action Recognition</h1>
+  <p class="sub">coad-mini · Something-Something V2 (48 classes, 8 sequential stages) · CLIP + GRU + A-GEM</p>
+  <p class="auth">[Name] · [Student ID] · [Course] · 2026</p>
+
+  <h2>Problem</h2>
+  <p>When a video action recognizer learns new action classes <em>sequentially</em> (in stages),
+  it <strong>catastrophically forgets</strong> earlier ones. We study how to mitigate this forgetting,
+  and — once mitigated — what the <em>next</em> bottleneck to accuracy actually is.</p>
+
+  <h2>Approach</h2>
+  <p>A compact pipeline trained stage by stage; <strong>A-GEM</strong> projects each gradient so updates
+  do not increase loss on a replay memory of past classes.</p>
+  <p class="pipe">video → 16 uniform frames → CLIP ViT-B/32 (512-d) → GRU classifier → 8-stage continual evaluation</p>
+
+  <h2>Key results</h2>
+  <div class="figs">
+    <figure>
+      <img src="../docs/assets/fig_levers.png" alt="lever effects">
+      <figcaption>Effect of each lever on Avg Acc (vs simple GRU + A-GEM).</figcaption>
+    </figure>
+    <figure>
+      <img src="../docs/assets/fig_data_scale.png" alt="data scaling">
+      <figcaption>Accuracy vs training-data fraction (B/32 vs L/14).</figcaption>
+    </figure>
+  </div>
+  <ul>
+    <li><strong>A-GEM beats sequential training:</strong> +14.1%p Avg Acc and +15.7%p Stage-1 forgetting
+        protection (48 classes / 8 stages, 3 seeds); the gain grows with more classes/stages.</li>
+    <li><strong>Source of the gain:</strong> class-balanced memory selection + a 25% replay ratio.</li>
+    <li><strong>Systematic bottleneck study</strong> (all controlled, same setup):</li>
+  </ul>
+  <table>
+    <tr><th>Lever</th><th>Δ Avg Acc</th><th>Verdict</th></tr>
+    <tr><td>GRU capacity (256→512, +layers)</td><td>~0.000</td><td>no gain</td></tr>
+    <tr><td>Backbone (CLIP B/32 → OpenCLIP L/14)</td><td class="pos">+0.013</td><td>within noise</td></tr>
+    <tr><td>Temporal model (GRU → GRU + Attention)</td><td class="neg">−0.103</td><td>worse (+forgetting)</td></tr>
+    <tr><td><strong>Training data (25% → 100%)</strong></td><td class="pos">+0.06–0.07</td><td><strong>dominant lever</strong></td></tr>
+  </table>
+
+  <div class="key"><strong>Conclusion.</strong> A simple <strong>GRU + A-GEM</strong> is the robust optimum for this
+  setting; further accuracy comes from <strong>data quantity, not architectural complexity</strong>. The
+  data-scaling curves are still rising at 100% — i.e. not yet saturated.</div>
+
+  <h2>System / demo</h2>
+  <p>On top of the model we built an interactive demo (live): realtime captioning (Baseline vs A-GEM,
+  upload or webcam), <strong>few-shot enrollment</strong> — teach a brand-new action from a few clips that
+  appears in the live caption instantly without forgetting the rest — and OOD / anomaly detection.</p>
+
+  <div class="foot">
+    Code &amp; reports: <a href="https://github.com/STkangyh/coad-mini">github.com/STkangyh/coad-mini</a> &nbsp;·&nbsp;
+    Live demo: <a href="https://yhoon-3-coad-mini.hf.space">yhoon-3-coad-mini.hf.space</a> &nbsp;·&nbsp;
+    Research log: <a href="https://stkangyh.github.io/coad-mini/">stkangyh.github.io/coad-mini</a>
+  </div>
+
+</body>
+</html>
