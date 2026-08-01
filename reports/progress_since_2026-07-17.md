@@ -1,5 +1,8 @@
 # 진행 사항 — 2026-07-20 이후 (미팅용 종합)
 
+
+> ⚠️ **2026-07-31 정정**: 이 문서의 base-heavy 결론("격차가 **+0.073**으로 벌어짐", "FeCAM이 GRU의 거의 2배")은 **철회됐다.** A-GEM replay가 세션당 고정 50개여서 36클래스 base가 클래스당 1.39개만 받은 탓이다. 공정한 예산에서는 **+0.045**이며, "반전 없음"이라는 핵심 결론만 유지된다 → [`base_heavy_split_result.md`](base_heavy_split_result.md)
+
 Generated: 2026-07-27. 범위: **21커밋**(`ea6cb29` 07-22 … `19c41f3` 07-27),
 37개 파일, +4,266 / −31 줄. 발표용 스크립트는
 [`reports/meeting_script_0726.md`](meeting_script_0726.md).
