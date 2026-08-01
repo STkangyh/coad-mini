@@ -404,17 +404,26 @@ PyCIL 저자는 Zhou Da-Wei · Wang Fu-Yun · Ye Han-Jia · Zhan De-Chuan (SCIS'
 **서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head.
 파라미터 학습 0개, gradient 0회, replay 버퍼 없음.
 
-| 벤치 | 지표 | 값 | 비고 |
+**정확도 — 바닥·천장과 함께** (전부 배포본 chunks4, 최종 전-클래스 정확도)
+
+| 벤치 | zero-shot(바닥) | **우리(class-IL)** | linear probe(천장) | 남은 여유 |
+|---|---|---|---|---|
+| UCF101 (101cls) | 69.13 | **88.74** | 89.21 | +0.48%p |
+| SSv2 (48cls) | 5.21 | **23.56** | 24.61 | +1.04%p |
+
+**증분 프로토콜 비용 = 0** (joint와 class-IL이 동일 — 항등식). **backprop이 사는 건 1%p 미만.**
+
+| 그 외 | 지표 | 값 | 비고 |
 |---|---|---|---|
-| SSv2 48-class | full-48-way | **0.236** | 배포본(chunks4, D=2048). held-out 선택 → 논문에 그대로 쓸 수 있음. mean 대비 **+7.8%p** |
 | SSv2 48-class | task-aware 6-way | **0.498** | |
-| UCF101 (TCD 프로토콜) | avg inc | **90.00** | ESSENTIAL 95.1 다음 2위 |
+| UCF101 (TCD 프로토콜) | avg inc | 90.00 | 구 변형(chunks3+adjdiff) 기준 — 재측정 필요 |
 | CIFAR-100 (PyCIL split) | avg inc | 0.769 | 교차 검증용 |
 | 실시간 | 학습+예측 | **39.4 fps** | CPU, 10 fps 예산의 25% |
 | 학습 비용 | fit only | **42 ms** | GRU+A-GEM 대비 6,400배↓ |
 
 **우리가 아직 못 이기는 축:** S1 backward-transfer(A-GEM의 −0.061은 리허설 고유 효과),
 그리고 SSv2 절대치(ESSENTIAL 48.9 vs 우리 23.6 — 게다가 프로토콜이 달라 직접 비교 불가).
+**단 UCF101 88.7 중 69.1은 CLIP이 이미 알던 것**이므로 표에 zero-shot을 빼면 기여가 과대평가된다.
 
 ---
 
@@ -517,6 +526,38 @@ TCD의 실제 SSv2 프로토콜은 **174클래스 중 84 base**인데, 우리는
 나머지 원본 영상이 없다**(`mobileclip_result.md`와 동일 차단). 재현한 것은 **구조와 평가
 관례**이지 클래스 수가 아니다. → **ESSENTIAL 48.9와는 여전히 직접 비교 불가.**
 
+## 2026-07-31 · 하한·상한으로 우리 수치 괄호치기 — 감사 5
+📄 [`bounds_context_result.md`](bounds_context_result.md) · [`run_bounds_context.py`](../dev/run_bounds_context.py)
+
+우리 수치가 잘한 것인지 판단할 문맥이 없었다. **우리 특징 위에서** 바닥(CLIP zero-shot,
+학습 0)과 천장(joint linear probe, backprop·전 클래스 한 번에·C는 held-out 선택)을 직접 계산.
+
+| | zero-shot(바닥) | **배포본 class-IL** | FeCAM joint | linear probe(천장) |
+|---|---|---|---|---|
+| UCF101 | 69.13 | **88.74** | 88.74 | 89.21 |
+| SSv2 | 5.21 | **23.56** | 23.56 | 24.61 |
+
+**⭐ 증분 프로토콜의 비용이 정확히 0이다.** joint와 class-IL이 두 벤치·두 특징 전부에서
+소수점까지 동일 — 측정이 아니라 **항등식**이다(순서 무관 합 → 문자 그대로 같은 모델).
+→ 서사를 **"증분인데도 잘한다"에서 "증분은 애초에 비용이 없다"로** 바꿔야 한다. 이번 주에만
+같은 항등식이 세 번째다(07-24 증분 불변, 07-31 `last` 시드 분산 0, 여기).
+*성립 조건 실측:* 클래스가 한 세션에만 등장할 때(=class-IL 정의) 정확히 0. 세션에 걸치면
+평균은 여전히 동일하고 공분산만 5.1e-3 차이(23.56 → 23.59).
+
+**⭐ 천장이 코앞 — backprop이 사는 건 UCF101 +0.48%p, SSv2 +1.04%p.** 닫힌 형태 헤드가
+학습형 선형 분류기의 99.5% / 95.7%를 42ms에 달성한다. "frozen feature 위에서 backprop은
+불필요하다"는 주장의 **가장 직접적인 증거**이자, **분류기 쪽엔 개선 여지가 없다**는 뜻
+(실시간 측정의 "병목은 인코더 91%"와 같은 결론에 정확도 축에서 도달). C를 1000까지 넓혀도
+천장 불변이라 과소평가가 아니다.
+
+**두 벤치에서 기여의 성격이 반대다.** 절대 이득은 비슷(≈19%p)한데 UCF101은 바닥이 69로 높아
+**상당 부분이 CLIP이 이미 알던 것**이고(→ 표에 zero-shot 병기 필수, 물음표 2 오염 우려와 연결),
+SSv2는 바닥이 chance의 2.5배뿐이라 우리가 **4.5배**를 만든다. **SSv2는 약점이 아니라 기여가
+큰 쪽으로 재배치해야 한다.**
+
+**chunks4 이득이 backprop 분류기에서도 재현.** SSv2 linear probe 16.80 → 24.61(+7.81)로
+FeCAM(+7.82)과 거의 동일 → "표현 수준 개선"이 학습형 분류기까지 확장 검증됐다.
+
 ## 자체 감사 (2026-07-30) — 개선점 10 · 물음표 10
 
 논문화 전에 스스로 약점을 찾아본 것. **⚙️ = 코드/데이터로 확인함**, **💭 = 판단**.
@@ -529,7 +570,7 @@ TCD의 실제 SSv2 프로토콜은 **174클래스 중 84 base**인데, 우리는
 | 2 | ~~**SSv2 실험에 seed 도입**~~ ✅ **07-31 완료** | ⚙️ 클래스 순서 5개로 재실행. **답이 바뀌었다** — `last`는 순서 무관이라 시드 분산이 정확히 0이고, 시드가 의미를 갖는 건 `avg_inc`뿐이다 |
 | 3 | ~~**pooling·구간 수 선택을 held-out으로**~~ ✅ **07-31 완료** | ⚙️ 편향이 실재했다: **1.14%p**(효과의 13%). 헤드라인 +8.97 → **+7.83**. 게다가 상위 5개 변형은 통계적으로 **구분 불가** |
 | 4 | **SSv2도 TCD 프로토콜로 평가** ◐ **07-31 부분 완료** | ⚙️ 구조(base-heavy)와 평가 관례(랜덤 순서)는 적용했고 개선이 거기서 더 견고했다(8.7×sd). **그러나 클래스 수는 불가** — 48클래스 feature뿐이고 원본 영상이 없다. ESSENTIAL 48.9와 여전히 직접 비교 불가 |
-| 5 | **zero-shot / linear-probe 상·하한 추가** | ⚙️ 레포 전체 grep 0건. 88.84가 잘한 수치인지 판단할 문맥이 없다 |
+| 5 | ~~**zero-shot / linear-probe 상·하한 추가**~~ ✅ **07-31 완료** | ⚙️ 바닥 UCF101 69.13 / SSv2 5.21, 천장 89.21 / 24.61. **증분 비용 0(항등식)**, **backprop 여유 0.5~1%p**를 확인 |
 | 6 | **CI에서 테스트 실행** | ⚙️ `.github/workflows`에 Pages 배포(`pages.yml`)만 존재 — 78개 테스트가 자동 실행되지 않음 |
 | 7 | **raw JSON에 git SHA·환경 메타데이터** | ⚙️ 07-27 stream-sim 표가 재현 불가였던 사고의 직접 원인 |
 | 8 | **app.py 분해** | ⚙️ 1,469줄, HTML/JS가 파이썬 문자열로 임베드 |
@@ -541,7 +582,7 @@ TCD의 실제 SSv2 프로토콜은 **174클래스 중 84 base**인데, 우리는
 | # | 항목 | 근거 |
 |---|---|---|
 | 1 | **"증분 크기 불변"은 발견인가 항등식인가** | ⚙️ raw JSON에서 `last`가 세 증분 전부 **비트 단위 동일**(`0.8744382765001322`) — 순서 무관 합이라 최종 모델이 문자 그대로 같다. 리포트는 "구조적 성질"이라 정직하게 썼지만, TCD −2.70 / ESSENTIAL −1.80과 한 표에 놓으면 경쟁 우위로 읽힌다. 게다가 그들은 backbone을 학습하는 **다른 트랙** — PyCIL 비교에 붙인 트랙 주석이 여기도 필요 |
-| 2 | **UCF101 88.84에 CLIP 사전학습 오염은?** | ⚙️ CIFAR 오염은 `pycil_bridge_result.md`에 명기했는데 **UCF101엔 같은 주석이 없다.** UCF101은 YouTube 영상, CLIP은 웹 크롤 |
+| 2 | **UCF101 88.84에 CLIP 사전학습 오염은?** ◐ 정량화됨 | ⚙️ 07-31: **zero-shot만으로 69.13** — CLIP이 UCF101을 이미 상당히 안다. 오염 여부와 무관하게 **표에 zero-shot 병기 필수**. SSv2는 5.21(chance 2.08)로 대비됨 |
 | 3 | **ESSENTIAL 95.1과 "2위" 비교가 성립하나** | 💭 그쪽은 frozen CLIP + **학습형** temporal encoder + prompt, 우리는 학습 0. 같은 표에 두려면 학습 예산 열이 필요 |
 | 4 | **"39fps 실시간 학습"이 정확도로 이어지나** | ⚙️ 벤치는 **속도만** 잰다. 온라인 1윈도우 학습의 정확도는 stream-sim 한 조건(UCF101·D=512·800프레임)뿐이고, 데모의 실제 few-shot 등록 정확도는 측정된 적 없음 |
 | 5 | **합성 프레임으로 잰 fps** | ⚙️ CLIP 인코딩은 입력 무관이라 무해하지만 카메라 디코딩·리사이즈가 빠져 있다 — 종단 주장인지 부분 주장인지 애매 |
@@ -631,3 +672,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-26 | [ucf101_tcd_result.md](ucf101_tcd_result.md) · [flops_result.md](flops_result.md) · [meeting_script_0726.md](meeting_script_0726.md) |
 | 07-27 | [encoder_swap_result.md](encoder_swap_result.md) · [meeting_deck_notion.md](meeting_deck_notion.md) · [progress_since_2026-07-17.md](progress_since_2026-07-17.md) |
 | 07-30 | [ssv2_temporal_pooling_result.md](ssv2_temporal_pooling_result.md) · [realtime_incremental_result.md](realtime_incremental_result.md) |
+| 07-31 | [bounds_context_result.md](bounds_context_result.md) |
