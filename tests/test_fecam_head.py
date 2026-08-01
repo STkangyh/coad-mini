@@ -279,7 +279,14 @@ def test_incremental_cache_matches_full_rebuild():
 
         ref._cov_cache = ref._mean_cache = None          # force a full rebuild
         ref._dirty.clear()
-        np.testing.assert_array_equal(inc.scores(X[:6]), ref.scores(X[:6]))
+        got, want = inc.scores(X[:6]), ref.scores(X[:6])
+        # Not bit-identity: patching one row computes mu[rows] @ prec, while the
+        # full rebuild computes the whole mu @ prec, and BLAS sums those in a
+        # different order. The gap is ~1 ULP (observed 3e-16 relative on numpy
+        # 2.5, 0 on 2.3), so pin it well below anything a real bug could hide in.
+        np.testing.assert_allclose(got, want, rtol=1e-12, atol=1e-12)
+        # Predictions must agree exactly -- that is the behavioural contract.
+        np.testing.assert_array_equal(got.argmax(axis=1), want.argmax(axis=1))
 
 
 def test_scores_cache_invalidated_by_new_enrollment():
