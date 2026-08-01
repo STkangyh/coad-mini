@@ -130,7 +130,7 @@ def test_scores_match_per_class_mahalanobis_reference():
     assert np.array_equal(got.argmax(axis=1), want.argmax(axis=1))
 
 
-def test_chunks3_pooling_is_order_sensitive_and_mean_is_not():
+def test_segment_pooling_is_order_sensitive_and_mean_is_not():
     """The whole point of the default pooling: reversing a window must change it.
 
     SSv2's confusable pairs ("push left-to-right" vs "right-to-left") are the same
@@ -138,26 +138,39 @@ def test_chunks3_pooling_is_order_sensitive_and_mean_is_not():
     """
     w = RNG.standard_normal((16, D))
     mean_h = FeCAMHead(D, 4, pooling="mean")
-    chunk_h = FeCAMHead(pooled_dim(D), 4, pooling="chunks3_adjdiff")
+    chunk_h = FeCAMHead(pooled_dim(D), 4)              # chunks4, the default
 
     np.testing.assert_allclose(mean_h.window_to_embedding(w),
                                mean_h.window_to_embedding(w[::-1]), atol=1e-12)
     assert not np.allclose(chunk_h.window_to_embedding(w),
                            chunk_h.window_to_embedding(w[::-1]))
 
-    # Reversal negates the segment differences exactly, but only when the three
-    # segments are the same length -- at T=16 they are 5/5/6, so use T=15 here.
-    w15 = RNG.standard_normal((15, D))
-    fwd = chunk_h.window_to_embedding(w15)
-    rev = chunk_h.window_to_embedding(w15[::-1])
+    # The mechanism is positional: reversal maps segment i to segment k+1-i, so
+    # the output is the same blocks in the opposite order. Exact only when the
+    # segments divide evenly (T=16 into 4 does; T=16 into 3 would be 5/5/6).
+    fwd = chunk_h.window_to_embedding(w)
+    rev = chunk_h.window_to_embedding(w[::-1])
+    for i in range(4):
+        j = 3 - i
+        np.testing.assert_allclose(fwd[i * D:(i + 1) * D],
+                                   rev[j * D:(j + 1) * D], atol=1e-12)
+
+
+def test_chunks3_adjdiff_still_flips_sign_under_reversal():
+    """The previous default stays supported, with its own mechanism intact."""
+    h = FeCAMHead(pooled_dim(D, "chunks3_adjdiff"), 4, pooling="chunks3_adjdiff")
+    assert h.feature_dim == 5 * D
+    # Equal-length segments are needed for the identity: 15 frames split 5/5/5.
+    w = RNG.standard_normal((15, D))
+    fwd, rev = h.window_to_embedding(w), h.window_to_embedding(w[::-1])
     np.testing.assert_allclose(fwd[3 * D:4 * D], -rev[4 * D:5 * D], atol=1e-12)
     np.testing.assert_allclose(fwd[4 * D:5 * D], -rev[3 * D:4 * D], atol=1e-12)
 
 
-def test_chunks3_head_enrolls_and_predicts_from_windows():
+def test_default_head_enrolls_and_predicts_from_windows():
     """End-to-end on the deployed default: (T, D) windows in, right class out."""
     h = FeCAMHead(pooled_dim(D), 8)
-    assert h.pooling == "chunks3_adjdiff" and h.feature_dim == 5 * D
+    assert h.pooling == "chunks4" and h.feature_dim == 4 * D
 
     base = RNG.standard_normal((16, D))
     for c in range(3):
@@ -171,25 +184,25 @@ def test_chunks3_head_enrolls_and_predicts_from_windows():
 
 
 def test_short_windows_do_not_produce_nans():
-    """A window shorter than 3 frames still has to yield a usable embedding."""
+    """A window with fewer frames than segments still yields a usable embedding."""
     h = FeCAMHead(pooled_dim(D), 4)
-    for t in (1, 2, 3):
+    for t in (1, 2, 3, 4):
         emb = h.window_to_embedding(RNG.standard_normal((t, D)))
-        assert emb.shape == (5 * D,) and np.isfinite(emb).all()
+        assert emb.shape == (4 * D,) and np.isfinite(emb).all()
 
 
 def test_save_load_preserves_pooling_and_is_lossless(tmp_path):
     """The checkpoint carries its pooling, and the float32 triangle costs nothing."""
     h = FeCAMHead(pooled_dim(D), 8)
-    X = RNG.standard_normal((120, 5 * D))
+    X = RNG.standard_normal((120, 4 * D))
     h.observe(X, np.repeat(np.arange(4), 30))
     p = tmp_path / "head.npz"
     h.save(p)
     h2 = FeCAMHead.load(p)
 
-    assert h2.pooling == "chunks3_adjdiff" and h2.feature_dim == 5 * D
+    assert h2.pooling == "chunks4" and h2.feature_dim == 4 * D
     np.testing.assert_array_equal(h2._cov_sum, h2._cov_sum.T)   # symmetry restored
-    Xq = RNG.standard_normal((10, 5 * D))
+    Xq = RNG.standard_normal((10, 4 * D))
     np.testing.assert_array_equal(h.scores(Xq).argmax(axis=1),
                                   h2.scores(Xq).argmax(axis=1))
     np.testing.assert_allclose(h.scores(Xq), h2.scores(Xq), rtol=1e-5)

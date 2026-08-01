@@ -14,9 +14,10 @@ are untouched) — forgetting-free enrollment by construction.
 
 Input convention: a "window" is the CLIP feature array of shape (T, D)
 (e.g. (16, 512)); `window_to_embedding` collapses T into one vector using this
-head's `pooling`. The default is `chunks3_adjdiff`, which keeps temporal order
-and so makes feature_dim 5x the per-frame dimension (2560 for CLIP B/32);
-`mean` is the older order-blind pooling, kept so existing checkpoints load.
+head's `pooling`. The default is `chunks4`, which keeps temporal order and so
+makes feature_dim 4x the per-frame dimension (2048 for CLIP B/32).
+`chunks3_adjdiff` (5x) was the previous default and `mean` the one before that;
+both are kept so existing checkpoints stay loadable.
 """
 from __future__ import annotations
 
@@ -45,28 +46,53 @@ def _pool_mean(w: np.ndarray) -> np.ndarray:
     return w.mean(axis=0)
 
 
+def _segment_means(w: np.ndarray, k: int) -> np.ndarray:
+    """k equal temporal segments, each mean-pooled -> (k*D,).
+
+    Order survives because segment i keeps its own slot in the output: reversing
+    the window swaps segment 1 with k, 2 with k-1, ... and so produces a
+    different vector. That is the whole mechanism -- mean-pool has one slot and
+    therefore cannot tell the two apart.
+    """
+    if len(w) < k:                      # too short to segment: repeat the tail
+        w = np.concatenate([w, np.repeat(w[-1:], k - len(w), axis=0)])
+    idx = np.linspace(0, len(w), k + 1).astype(int)
+    return np.concatenate([w[idx[i]:idx[i + 1]].mean(axis=0) for i in range(k)])
+
+
+def _pool_chunks4(w: np.ndarray) -> np.ndarray:
+    """Four temporal segment means. The deployed default (D = 4x per-frame).
+
+    Chosen on a held-out split of TRAIN, never on val -- see
+    reports/ssv2_temporal_pooling_result.md §10. Worth +7.83pp on SSv2 over
+    mean-pool. Note the honest caveat from that section: the top few
+    order-preserving poolings are statistically indistinguishable on our data,
+    so this is "one of the best", not "the best".
+    """
+    return _segment_means(w, 4)
+
+
 def _pool_chunks3_adjdiff(w: np.ndarray) -> np.ndarray:
-    """Three temporal segment means + the differences between adjacent segments.
+    """Three segment means + differences between adjacent segments (D = 5x).
 
-    The segments say what the window looked like in each third; the adjacent
-    differences say how it changed between thirds, and they flip sign when the
-    action is reversed -- which is exactly what mean-pool destroys. Output is 5x
-    the per-frame dimension (3 segments + 2 differences).
-
-    Closed form: no parameters, no gradients. Worth +8.97pp on SSv2 and +1.17pp
-    on UCF101 over mean-pool; 3 segments beat 2, 4, 6 and 8.
+    The previous default. Kept because checkpoints written with it must stay
+    loadable, and because it is the variant the original study reported. Its
+    extra signal over plain segments is the adjacent differences, which flip
+    sign when the action reverses; measured against `chunks4` that buys nothing
+    distinguishable from noise (2 wins in 5 seeds).
     """
     d = w.shape[1]
-    if len(w) < 3:                      # too short to segment: repeat the tail
-        w = np.concatenate([w, np.repeat(w[-1:], 3 - len(w), axis=0)])
-    idx = np.linspace(0, len(w), 4).astype(int)
-    c = np.concatenate([w[idx[i]:idx[i + 1]].mean(axis=0) for i in range(3)])
+    c = _segment_means(w, 3)
     return np.concatenate([c, c[d:2 * d] - c[:d], c[2 * d:] - c[d:2 * d]])
 
 
-POOLINGS = {"mean": _pool_mean, "chunks3_adjdiff": _pool_chunks3_adjdiff}
-POOLING_DIM_FACTOR = {"mean": 1, "chunks3_adjdiff": 5}
-DEFAULT_POOLING = "chunks3_adjdiff"
+POOLINGS = {
+    "mean": _pool_mean,
+    "chunks4": _pool_chunks4,
+    "chunks3_adjdiff": _pool_chunks3_adjdiff,
+}
+POOLING_DIM_FACTOR = {"mean": 1, "chunks4": 4, "chunks3_adjdiff": 5}
+DEFAULT_POOLING = "chunks4"
 
 
 def pooled_dim(frame_dim: int, pooling: str = DEFAULT_POOLING) -> int:

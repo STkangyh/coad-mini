@@ -401,14 +401,13 @@ PyCIL 저자는 Zhou Da-Wei · Wang Fu-Yun · Ye Han-Jia · Zhan De-Chuan (SCIS'
 
 ## 현재 상태 (2026-07-30 기준)
 
-**서빙 구성:** frozen CLIP ViT-B/32 → chunks3+adjdiff pooling(2560-d) → FeCAM shared-cov head.
+**서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head.
 파라미터 학습 0개, gradient 0회, replay 버퍼 없음.
 
 | 벤치 | 지표 | 값 | 비고 |
 |---|---|---|---|
-| SSv2 48-class | full-48-way | **0.247** | 배포본(chunks3+adjdiff). 단 이 변형은 **val을 보고 골랐다** |
-| SSv2 48-class | full-48-way (held-out 선택) | **0.236** | **논문에 쓸 수치** — mean 대비 +7.8%p |
-| SSv2 48-class | task-aware 6-way | **0.507** | |
+| SSv2 48-class | full-48-way | **0.236** | 배포본(chunks4, D=2048). held-out 선택 → 논문에 그대로 쓸 수 있음. mean 대비 **+7.8%p** |
+| SSv2 48-class | task-aware 6-way | **0.498** | |
 | UCF101 (TCD 프로토콜) | avg inc | **90.00** | ESSENTIAL 95.1 다음 2위 |
 | CIFAR-100 (PyCIL split) | avg inc | 0.769 | 교차 검증용 |
 | 실시간 | 학습+예측 | **39.4 fps** | CPU, 10 fps 예산의 25% |
