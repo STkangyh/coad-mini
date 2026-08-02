@@ -401,7 +401,8 @@ PyCIL 저자는 Zhou Da-Wei · Wang Fu-Yun · Ye Han-Jia · Zhan De-Chuan (SCIS'
 
 ## 현재 상태 (2026-07-30 기준)
 
-**서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head.
+**서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head
+(`few_shot_correction` 켬 — base 예측에는 영향 없고 라이브 등록에만 작용).
 파라미터 학습 0개, gradient 0회, replay 버퍼 없음.
 
 **정확도 — 바닥·천장과 함께** (전부 배포본 chunks4, 최종 전-클래스 정확도)
@@ -590,8 +591,8 @@ E[(x−m̂)′P(x−m̂)] = 참거리 + **tr(P·Σ)/n**. 합성 데이터로 1/n
 | UCF101 5-shot | 66.4 → **83.2** | −0.6 | **+2.4** |
 | SSv2 5-shot | 0.14 → 9.5 | −8.5 | −3.3 |
 
-**분리 가능하면 이득, 겹치면 base를 내준다.** 그래서 `few_shot_correction=True` opt-in,
-기본 off.
+**분리 가능하면 이득, 겹치면 base를 내준다.** 라이브러리 기본은 off이되 **배포본에서는 켰다**
+(07-31) — 데모 용도가 UCF101형이고, 배포 체크포인트에서 base 예측 불변을 재확인(0/4,702).
 
 **결정적 성질 — 균등 표본에서 정확히 no-op:** 모든 n이 같으면 전 클래스에 같은 상수를 더하므로
 argmax 불변. SSv2(100/class 균등)에서 **argmax 변화 0/4,702, 비트 동일**. UCF101(72~121)도

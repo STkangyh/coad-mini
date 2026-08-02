@@ -259,7 +259,8 @@ def _load_fecam():
 _fecam_head = _load_fecam()
 if _fecam_head is not None:
     print(f"✓ FeCAM head loaded (n_classes={_fecam_head.n_classes}, "
-          f"pooling={_fecam_head.pooling}, dim={_fecam_head.feature_dim})")
+          f"pooling={_fecam_head.pooling}, dim={_fecam_head.feature_dim}, "
+          f"few_shot_correction={_fecam_head.few_shot_correction})")
 else:
     print("⚠ FeCAM head not found — run dev/build_fecam_head.py (demo works without it)")
 
@@ -361,6 +362,8 @@ def health():
         "fecam_ready": _fecam_head is not None,
         "fecam_n_classes": _fecam_head.n_classes if _fecam_head else 0,
         "fecam_pooling": _fecam_head.pooling if _fecam_head else None,
+        "fecam_few_shot_correction": (_fecam_head.few_shot_correction
+                                      if _fecam_head else None),
     }
 
 

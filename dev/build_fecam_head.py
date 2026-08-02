@@ -7,7 +7,13 @@ checkpoints/fecam_head.npz, then sanity-checks on val (both eval regimes).
 The window pooling is baked into the checkpoint, so this must be rebuilt when the
 default changes -- the served head pools requests the same way it was fitted.
 
-Run: python3 dev/build_fecam_head.py [pooling]      # default: DEFAULT_POOLING
+The served head enables `few_shot_correction`: with the balanced 48-class
+training set it is a strict no-op (every class has 100 examples, so the
+correction adds the same constant to every score), and it only starts acting
+once a user enrolls a class from a handful of clips -- which is exactly the
+case it was derived for. See reports/enrollment_covariance_result.md.
+
+Run: python3 dev/build_fecam_head.py [pooling] [--no-few-shot-correction]
 """
 import sys, time
 from pathlib import Path
@@ -41,12 +47,16 @@ def load_split(split, pooling):
 
 
 def main():
-    pooling = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_POOLING
+    argv = [a for a in sys.argv[1:] if a != "--no-few-shot-correction"]
+    fsc = "--no-few-shot-correction" not in sys.argv
+    pooling = argv[0] if argv else DEFAULT_POOLING
     Xtr, ytr = load_split("train", pooling)
     Xva, yva = load_split("val", pooling)
-    print(f"pooling={pooling}  train {Xtr.shape}, val {Xva.shape}")
+    print(f"pooling={pooling}  few_shot_correction={fsc}  "
+          f"train {Xtr.shape}, val {Xva.shape}")
 
-    head = FeCAMHead(feature_dim=Xtr.shape[1], max_classes=256, pooling=pooling)
+    head = FeCAMHead(feature_dim=Xtr.shape[1], max_classes=256, pooling=pooling,
+                     few_shot_correction=fsc)
     t0 = time.perf_counter()
     # stage-wise observe (equivalent to batch for means/cov; mirrors CL arrival)
     for cids in STAGES.values():
