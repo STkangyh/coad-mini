@@ -32,6 +32,7 @@ from experiments.run_capacity_ablation import (  # noqa: E402
 )
 from src.trainer import set_seed, train_epoch  # noqa: E402
 from src.utils.gem import AGEM  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 from dev.run_base_heavy_split import (  # noqa: E402
     FEATURE_DIR, eval_gru_classIL,
 )
@@ -87,10 +88,10 @@ def main():
     print("(reference: GRU+A-GEM full-48-way full acc on record = 0.105)")
 
     out = Path("reports/ssv2_gru_curve_raw.json")
-    out.write_text(json.dumps({
+    save_results(out, {
         "per_step_mean": [float(x) for x in avg_curve],
         "avg_inc": avg_inc, "last": last, "epochs": EPOCHS, "runs": runs,
-    }, indent=2))
+    })
     print(f"raw -> {out}")
 
 

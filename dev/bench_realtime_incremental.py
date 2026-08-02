@@ -48,6 +48,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 N_FRAMES = 16
 DIM = 512
@@ -110,7 +111,7 @@ def dim_sweep(n_classes):
         print(f"{name:30s} {dim:5d} {r['predict']:8.2f}ms {r['enroll']:8.2f}ms "
               f"{r['full']:8.1f}ms")
     out = ROOT / "reports/realtime_dim_sweep_raw.json"
-    out.write_text(json.dumps(rows, indent=2))
+    save_results(out, rows)
     print(f"\nraw -> {out}")
 
 
@@ -137,7 +138,7 @@ def class_sweep(dim=DIM, counts=(48, 101, 250, 500)):
         rows[k] = r
         print(f"{k:8d} {r['predict']:8.2f}ms {r['enroll']:8.2f}ms {r['full']:8.2f}ms")
     out = ROOT / "reports/realtime_class_sweep_raw.json"
-    out.write_text(json.dumps(rows, indent=2))
+    save_results(out, rows)
     print(f"\nraw -> {out}")
 
 
@@ -198,7 +199,7 @@ def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0)):
         print(f"{label:22s} {100*acc:8.2f}% {dt:13.2f}ms {1000/dt:8.0f}")
 
     out = ROOT / "reports/realtime_stream_sim_raw.json"
-    out.write_text(json.dumps(rows, indent=2))
+    save_results(out, rows)
     print(f"\nraw -> {out}")
 
 
@@ -330,14 +331,14 @@ def main():
     print(f"\nheadroom at 10 fps: {BUDGET_MS - learn_enroll:.1f} ms/frame")
 
     out = ROOT / "reports/realtime_incremental_raw.json"
-    out.write_text(json.dumps({
+    save_results(out, {
         "device": dev, "budget_ms": BUDGET_MS, "n_classes": args.classes,
         "dim": DIM, "stages_ms": stages,
         "predict_only_ms": predict_only, "learn_enroll_ms": learn_enroll,
         "learn_full_ms": learn_full_e2e,
         "encoder_share_pct": 100 * enc / learn_enroll,
         "head_share_pct": 100 * head_enroll / learn_enroll,
-    }, indent=2))
+    })
     print(f"\nraw -> {out}")
 
 

@@ -49,6 +49,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEAT = ROOT / "data/features_ucf101_b32"     # overridable via --features
 N_CLASSES = 101
@@ -205,7 +206,7 @@ def main():
 
     tag = args.tag or ("" if not args.features else "_" + FEAT.name.replace("features_ucf101_", ""))
     out = ROOT / f"reports/ucf101_tcd_raw{tag}.json"
-    out.write_text(json.dumps(results, indent=2))
+    save_results(out, results)
     print(f"raw -> {out}")
 
 

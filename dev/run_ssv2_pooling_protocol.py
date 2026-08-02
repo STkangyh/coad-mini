@@ -45,6 +45,7 @@ sys.path.insert(0, ".")
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
 from src.trainer import load_samples  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEATURE_DIR = Path("data/features")
 N_CLASSES = 48
@@ -234,10 +235,10 @@ def main():
             "note": "last has zero seed variance: order-independent final model",
         }
 
-    OUT.write_text(json.dumps({
+    save_results(OUT, {
         "seeds": args.seeds, "select_frac": args.select_frac,
         "selected_on_train": chosen, "selection": selection, "report": report,
-    }, indent=2))
+    })
     print(f"\nraw -> {OUT}   ({time.perf_counter()-t0:.0f}s total)")
 
 

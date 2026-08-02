@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 from src.models.gru_detector import GRUDetector  # noqa: E402
 from src.trainer import set_seed, train_epoch  # noqa: E402
 from src.utils.gem import AGEM  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEAT = ROOT / "data/features_ucf101_b32"
 N_CLASSES = 101
@@ -147,9 +148,8 @@ def main():
     print(f"(FeCAM on the same protocol: 88.84±0.52 / 87.44)")
 
     out = ROOT / "reports/ucf101_gru_agem_raw.json"
-    out.write_text(json.dumps({"avg_inc": float(avg), "avg_inc_std": float(std),
-                               "last": float(last), "epochs": args.epochs,
-                               "runs": runs}, indent=2))
+    save_results(out, {"avg_inc": float(avg), "avg_inc_std": float(std),
+                       "last": float(last), "epochs": args.epochs, "runs": runs})
     print(f"raw -> {out}")
 
 

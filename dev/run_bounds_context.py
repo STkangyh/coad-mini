@@ -44,6 +44,7 @@ sys.path.insert(0, ".")
 
 from src.models.fecam_head import POOLINGS, FeCAMHead  # noqa: E402
 from src.trainer import load_samples  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "reports/bounds_context_raw.json"
@@ -220,7 +221,7 @@ def main():
         print(f"  [{time.perf_counter()-t0:.0f}s]")
         results[bench] = row
 
-    OUT.write_text(json.dumps(results, indent=2))
+    save_results(OUT, results)
     print(f"\nraw -> {OUT}")
 
 

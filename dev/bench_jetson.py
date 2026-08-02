@@ -37,6 +37,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.utils.provenance import save_results  # noqa: E402
+
 OUT = ROOT / "reports/jetson_raw.json"
 
 # tegrastats prints e.g. "VDD_GPU_SOC 1234mW/1200mW" -- current/average per rail.
@@ -137,7 +139,7 @@ def save(tag, payload):
     all_runs = json.loads(OUT.read_text()) if OUT.exists() else {}
     all_runs.setdefault(tag, []).append(payload)
     OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps(all_runs, indent=2))
+    save_results(OUT, all_runs)
     print(f"\nraw -> {OUT}  (tag={tag}, run #{len(all_runs[tag])})")
 
 

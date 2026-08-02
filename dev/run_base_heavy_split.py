@@ -63,6 +63,7 @@ from experiments.run_capacity_ablation import (
 from src.models.fecam_head import FeCAMHead
 from src.trainer import set_seed, train_epoch
 from src.utils.gem import AGEM
+from src.utils.provenance import save_results  # noqa: E402
 
 FEATURE_DIR = Path("data/features")   # CLIP B/32, already extracted for all 48 classes
 FEATURE_DIM = 512
@@ -254,7 +255,7 @@ def main():
     print("\nALL DONE")
     import json
     Path("reports").mkdir(exist_ok=True)
-    Path(args.out).write_text(json.dumps(results, indent=2))
+    save_results(args.out, results)
     print(f"raw -> {args.out}")
 
 

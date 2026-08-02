@@ -34,6 +34,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "external/PyCIL"))
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEAT_CACHE = REPO / "data/features_cifar100_b32"
 N_CLASSES = 100
@@ -211,7 +212,7 @@ def main():
         results["heads"][head.name] = r
 
     out = REPO / f"reports/pycil_bridge_b{args.init}_i{args.inc}_raw.json"
-    out.write_text(json.dumps(results, indent=2))
+    save_results(out, results)
     print(f"raw -> {out}")
 
 

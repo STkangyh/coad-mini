@@ -1,4 +1,39 @@
 {
+  "_meta": {
+    "generated_utc": "2026-08-02T02:28:18+00:00",
+    "git_commit": "6b5cfa85e28b990156412e17a6b9a1d0934d3016",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "enchmarks/pycil/run_analytic_cifar100.py",
+      "dev/bench_jetson.py",
+      "dev/bench_realtime_incremental.py",
+      "dev/run_base_heavy_split.py",
+      "dev/run_bounds_context.py",
+      "dev/run_ssv2_gru_curve.py",
+      "dev/run_ssv2_head_curves.py",
+      "dev/run_ssv2_pooling_protocol.py",
+      "dev/run_ssv2_temporal_pooling.py",
+      "dev/run_ucf101_gru_agem.py",
+      "dev/run_ucf101_tcd_protocol.py",
+      "reports/ssv2_head_curves_raw.json",
+      "reports/ssv2_temporal_pooling_raw.json",
+      "src/utils/provenance.py",
+      "tests/test_provenance.py"
+    ],
+    "script": "dev/run_ssv2_temporal_pooling.py",
+    "argv": [
+      "--help"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
   "mean (baseline)": {
     "per_step": [
       0.48,
@@ -12,7 +47,7 @@
     ],
     "avg_inc": 0.24192441497020198,
     "last": 0.15737983836665248,
-    "fit_s": 0.41625329200178385,
+    "fit_s": 0.36998787499032915,
     "dim": 512
   },
   "mean+std": {
@@ -28,7 +63,7 @@
     ],
     "avg_inc": 0.24686830642678187,
     "last": 0.1678009357720119,
-    "fit_s": 1.0325873750261962,
+    "fit_s": 0.9366713750641793,
     "dim": 1024
   },
   "halves": {
@@ -44,7 +79,7 @@
     ],
     "avg_inc": 0.32713185573364495,
     "last": 0.22735006380263717,
-    "fit_s": 0.9941836250945926,
+    "fit_s": 0.9162697501014918,
     "dim": 1024
   },
   "thirds": {
@@ -60,7 +95,7 @@
     ],
     "avg_inc": 0.3391960457279378,
     "last": 0.24053594215227564,
-    "fit_s": 1.858945959014818,
+    "fit_s": 1.9680822079535574,
     "dim": 1536
   },
   "mean+diff": {
@@ -76,7 +111,7 @@
     ],
     "avg_inc": 0.3049936924041045,
     "last": 0.2069332199064228,
-    "fit_s": 0.9842161668930203,
+    "fit_s": 0.9818719159811735,
     "dim": 1024
   },
   "diff only": {
@@ -92,7 +127,7 @@
     ],
     "avg_inc": 0.22647339461718052,
     "last": 0.13122075712462783,
-    "fit_s": 0.3675848329439759,
+    "fit_s": 0.3383469160180539,
     "dim": 512
   },
   "mean+diff+|diff|": {
@@ -108,7 +143,7 @@
     ],
     "avg_inc": 0.30822997457693535,
     "last": 0.21501488728200766,
-    "fit_s": 1.8977637079078704,
+    "fit_s": 1.7854059168603271,
     "dim": 1536
   },
   "chunks3+adjdiff (best)": {
@@ -124,7 +159,7 @@
     ],
     "avg_inc": 0.35370999142946113,
     "last": 0.24712888132709485,
-    "fit_s": 5.1132653339300305,
+    "fit_s": 4.891003041062504,
     "dim": 2560
   }
 }

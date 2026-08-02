@@ -41,6 +41,7 @@ sys.path.insert(0, ".")
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
 from src.trainer import load_samples  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEATURE_DIR = Path("data/features")
 N_CLASSES = 48
@@ -172,7 +173,7 @@ def main():
         results[name] = {**r, "dim": int(Xtr.shape[1])}
 
     out = Path("reports/ssv2_temporal_pooling_raw.json")
-    out.write_text(json.dumps(results, indent=2))
+    save_results(out, results)
     print(f"\nraw -> {out}")
 
 

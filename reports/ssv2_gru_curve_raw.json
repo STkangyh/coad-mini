@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "provenance": "unknown",
+    "note": "Predates provenance tracking (added 2026-07-31). The producing commit and working-tree state were not recorded, so these numbers cannot be tied to specific code. Re-run the script named in the corresponding report to regenerate with provenance."
+  },
   "per_step_mean": [
     0.34166666666666673,
     0.23111111111111113,
