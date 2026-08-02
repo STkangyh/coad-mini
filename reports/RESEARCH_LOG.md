@@ -597,6 +597,41 @@ E[(x−m̂)′P(x−m̂)] = 참거리 + **tr(P·Σ)/n**. 합성 데이터로 1/n
 argmax 불변. SSv2(100/class 균등)에서 **argmax 변화 0/4,702, 비트 동일**. UCF101(72~121)도
 10/3,783에 정확도 불변. → **보고된 벤치 수치가 하나도 영향받지 않는다.**
 
+## 2026-07-31 · 메모리 실측 — 감사 10
+📄 [`memory_footprint_result.md`](memory_footprint_result.md)
+
+RAM 근거가 GRU 시절 학습 수치 `0.95 GB` 하나뿐이었다. 배포 경로를 분해:
+
+| | RSS 증가 |
+|---|---|
+| CLIP vision tower (87.5M) | +259 MB |
+| FeCAM 헤드 (D=2048) | +233 MB |
+| **총 RSS** | **703 MB** |
+
+**시간에서는 인코더가 91%였지만 메모리에서는 대등하다.** 헤드는 D×D 두 장(cov_sum +
+precision, 67 MB)이 지배하고 **클래스 수는 거의 무관**(256슬롯 means가 4.2 MB) —
+"클래스를 늘려도 안 깨진다"가 속도에 이어 메모리에서도 성립.
+
+### ⭐ 임시 할당이 실제 배열의 5배였다 → 91 MB 절감
+
+헤드 배열은 72.9 MB인데 RSS 증가는 388 MB였다. `_cov_terms()`가 **D×D 임시를 10장 넘게**
+거쳐가고(장당 33.6 MB), 할당자가 아레나를 OS에 반납하지 않는다. in-place로 고치고,
+특히 **`tr(P@S)`를 행렬곱 없이 `einsum("ij,ji->")`** 로 바꿔 D×D 할당 제거 + O(D³)→O(D²).
+
+| | 전 | 후 |
+|---|---|---|
+| 헤드 로드 | 173.9 MB | 115.6 MB |
+| 첫 scores() | 388.2 MB | **297.0 MB (−23%)** |
+
+정확도 불변: 15시드 대조 precision 1 ULP(5.8e-16), 실데이터 4,702샘플 **argmax 100% 일치,
+정확도 소수점 6자리까지 동일**.
+
+### 물음표 9에 대한 답 — 우리는 SBC/로봇 급이지 MCU 급이 아니다
+
+703 MB는 Jetson Orin·RPi5·폰 SoC에서는 되지만 **MCU급 글래스에서는 불가**. 헤드만 줄여도
+CLIP 259 MB가 남는다. 논문에서 "AI 글래스"를 말하려면 이 수치를 병기하거나 대상을
+로봇/SBC로 좁혀야 한다.
+
 ## 자체 감사 (2026-07-30) — 개선점 10 · 물음표 10
 
 논문화 전에 스스로 약점을 찾아본 것. **⚙️ = 코드/데이터로 확인함**, **💭 = 판단**.
@@ -614,7 +649,7 @@ argmax 불변. SSv2(100/class 균등)에서 **argmax 변화 0/4,702, 비트 동�
 | 7 | ~~**raw JSON에 git SHA·환경 메타데이터**~~ ✅ **07-31 완료** | ⚙️ `src/utils/provenance.py` — 11개 writer 전부 전환. **`dirty` 플래그가 핵심**(트리가 더러우면 SHA가 코드를 특정 못 함 — 07-27이 정확히 그 경우). 기존 15개는 출처를 지어내지 않고 **'NO PROVENANCE'로 표시** |
 | 8 | **app.py 분해** | ⚙️ 1,469줄, HTML/JS가 파이썬 문자열로 임베드 |
 | 9 | ~~**등록 클래스의 공분산 문제 측정**~~ ✅ **07-31 완료** | ⚙️ **공분산은 무해**(few-shot 이득 +0.00~0.33). 대신 **few-shot 등록 자체가 표본 수 비대칭으로 불리**함을 발견(SSv2 5-shot 0.14%). 편향의 닫힌 형태 tr(PΣ)/n을 찾아 opt-in 보정 추가 |
-| 10 | **메모리를 상시 지표로** | 💭 RAM 수치가 `0.95GB` 하나뿐이고 그건 GRU 시절 것. D=2560이면 precision 행렬만 52MB |
+| 10 | ~~**메모리를 상시 지표로**~~ ✅ **07-31 완료** | ⚙️ `--memory` 모드 추가. 총 703 MB(CLIP 259 + 헤드 233). **임시 할당이 배열의 5배**임을 발견해 91 MB 절감(정확도 불변). **SBC/로봇 급이지 MCU 급 아님**을 명시 |
 
 ### 물음표 (답을 모르는 것)
 
@@ -628,7 +663,7 @@ argmax 불변. SSv2(100/class 균등)에서 **argmax 변화 0/4,702, 비트 동�
 | 6 | **SSv2 나머지 18pp가 정말 학습형 encoder 몫인가** | 💭 23.6 vs ESSENTIAL baseline 42.1의 격차를 그렇게 귀속했으나 **우리 큐레이션·클래스 수**와 분리 안 됨. 07-31에 구조는 맞췄지만 **클래스 수는 여전히 불가**(48 vs 174) — 미해결 |
 | 7 | **48-class 큐레이션의 대표성** | 💭 8 stages × 6개를 사람이 골랐다. 랜덤 48개와 비교한 적이 없어 큐레이션이 결론을 만들었는지 알 수 없다 |
 | 8 | **T=16의 5/5/6 비대칭이 메커니즘 설명과 어긋난다** | ⚙️ 개선 근거는 "역재생하면 차분 부호가 뒤집힌다"인데 T=16은 구간이 5/5/6이라 **정확히 성립하지 않는다**(테스트 작성 중 발견, T가 3의 배수일 때만 성립). 왜 16인지 재검토 필요 |
-| 9 | **13MB 체크포인트·D² 공분산이 "스마트글래스"와 맞나** | 💭 클래스가 늘어도 안 커지는 건 장점이나 MCU급엔 과하다. Jetson AGX Orin(15~60W) 대여도 같은 긴장 — **타깃이 글래스인지 로봇인지** 정해야 한다 |
+| 9 | **체크포인트·D² 공분산이 "스마트글래스"와 맞나** ◐ 정량화됨 | ⚙️ 07-31: 총 **703 MB**(CLIP 259 + 헤드 233). RPi5·폰 SoC까지는 가능, **MCU급 글래스는 불가**. 대상을 로봇/SBC로 좁히거나 수치를 병기해야 한다 |
 | 10 | **우리 고유 기여가 무엇인가 — 가장 중요** | 💭 이득의 대부분은 "frozen feature + 통계 head"에서 오는데 그건 **SimpleCIL/RanPAC/FeCAM(2023~24)이 이미 확립**한 것이고 우리는 재현·검증했다. 고유 기여 후보는 **닫힌 형태 temporal pooling**(비디오 CIL에서 backprop 없이 시간 축을 살린 것)인데 아직 **단일 실행·자체 프로토콜**이다 |
 
 **우선순위:** 개선점 **2·3·4를 묶어서** — SSv2를 TCD 프로토콜에 seed 3개로 올리고 pooling
@@ -711,4 +746,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-26 | [ucf101_tcd_result.md](ucf101_tcd_result.md) · [flops_result.md](flops_result.md) · [meeting_script_0726.md](meeting_script_0726.md) |
 | 07-27 | [encoder_swap_result.md](encoder_swap_result.md) · [meeting_deck_notion.md](meeting_deck_notion.md) · [progress_since_2026-07-17.md](progress_since_2026-07-17.md) |
 | 07-30 | [ssv2_temporal_pooling_result.md](ssv2_temporal_pooling_result.md) · [realtime_incremental_result.md](realtime_incremental_result.md) |
-| 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) |
+| 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) · [memory_footprint_result.md](memory_footprint_result.md) |

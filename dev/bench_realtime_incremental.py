@@ -47,7 +47,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.models.fecam_head import FeCAMHead  # noqa: E402
+from src.models.fecam_head import POOLING_DIM_FACTOR, FeCAMHead  # noqa: E402
 from src.utils.provenance import save_results  # noqa: E402
 
 N_FRAMES = 16
@@ -113,6 +113,83 @@ def dim_sweep(n_classes):
     out = ROOT / "reports/realtime_dim_sweep_raw.json"
     save_results(out, rows)
     print(f"\nraw -> {out}")
+
+
+def _rss_mb():
+    """Resident set size. psutil if present, else peak-only via resource."""
+    try:
+        import psutil
+        return psutil.Process().memory_info().rss / 1e6, True
+    except ImportError:
+        import resource
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return (peak if sys.platform == "darwin" else peak * 1024) / 1e6, False
+
+
+def head_bytes(head):
+    """Exact footprint of what the head holds, by component."""
+    parts = {"means": head.means.nbytes, "counts": head.counts.nbytes,
+             "cov_sum": head._cov_sum.nbytes}
+    if head._cov_cache is not None:
+        prec, sd, _ = head._cov_cache
+        parts["precision"] = prec.nbytes
+        parts["sd"] = sd.nbytes
+    if head._mean_cache is not None:
+        active, mu, mu_prec, mu_quad = head._mean_cache
+        parts["mean_cache"] = mu.nbytes + mu_prec.nbytes + mu_quad.nbytes + active.nbytes
+    return parts
+
+
+def memory_report(n_classes=48):
+    """Where the bytes actually go, and how the head scales with the pooling.
+
+    The one RAM figure on record (0.95 GB) is from the GRU era and measured a
+    training run; the deployed system is a different shape. This separates the
+    encoder from the head, because only the head grows with the pooling choice.
+    """
+    rss0, live = _rss_mb()
+    kind = "RSS" if live else "peak RSS (psutil absent)"
+    print(f"process {kind}\n  {'after imports':28s} {rss0:8.1f} MB")
+
+    from transformers import AutoModel
+    model = AutoModel.from_pretrained("openai/clip-vit-base-patch32").eval()
+    rss1, _ = _rss_mb()
+    n_par = sum(p.numel() for p in model.vision_model.parameters())
+    print(f"  {'+ CLIP vision tower':28s} {rss1:8.1f} MB  (+{rss1-rss0:.0f}, "
+          f"{n_par/1e6:.1f}M params)")
+
+    head = FeCAMHead.load(ROOT / "checkpoints/fecam_head.npz")
+    head.scores(np.zeros((1, head.feature_dim)))          # warm both caches
+    rss2, _ = _rss_mb()
+    print(f"  {'+ FeCAM head (served)':28s} {rss2:8.1f} MB  (+{rss2-rss1:.0f})")
+
+    print(f"\nhead components, D={head.feature_dim}, max_classes={head.max_classes}")
+    parts = head_bytes(head)
+    for k, v in sorted(parts.items(), key=lambda kv: -kv[1]):
+        print(f"  {k:28s} {v/1e6:8.1f} MB")
+    print(f"  {'total':28s} {sum(parts.values())/1e6:8.1f} MB")
+
+    print(f"\nhead RAM vs pooling (max_classes={head.max_classes}, "
+          f"two DxD matrices dominate)")
+    print(f"{'pooling':22s} {'D':>6s} {'checkpoint':>12s} {'RAM':>9s}")
+    print("-" * 54)
+    rows = {}
+    for name, factor in sorted(POOLING_DIM_FACTOR.items(), key=lambda kv: kv[1]):
+        d = 512 * factor
+        h = FeCAMHead(feature_dim=d, max_classes=head.max_classes, pooling=name)
+        h.observe(np.random.default_rng(0).standard_normal((n_classes * 2, d)),
+                  np.repeat(np.arange(n_classes), 2))
+        h.scores(np.zeros((1, d)))
+        ram = sum(head_bytes(h).values()) / 1e6
+        ckpt = (d * (d + 1) // 2 * 4 + h.means.nbytes) / 1e6   # float32 triangle + means
+        rows[name] = {"dim": d, "ram_mb": ram, "checkpoint_mb": ckpt}
+        print(f"{name:22s} {d:6d} {ckpt:10.1f} MB {ram:7.1f} MB")
+
+    out = {"rss_mb": {"imports": rss0, "with_clip": rss1, "with_head": rss2,
+                      "live_rss": live},
+           "served_head_components_bytes": parts, "by_pooling": rows}
+    save_results(ROOT / "reports/realtime_memory_raw.json", out)
+    print(f"\nraw -> reports/realtime_memory_raw.json")
 
 
 def class_sweep(dim=DIM, counts=(48, 101, 250, 500)):
@@ -214,6 +291,8 @@ def main():
                     help="accuracy vs covariance-refresh period on real UCF101")
     ap.add_argument("--class-sweep", action="store_true",
                     help="head cost vs number of enrolled classes")
+    ap.add_argument("--memory", action="store_true",
+                    help="where RAM goes: encoder vs head, and head scaling")
     args = ap.parse_args()
 
     if args.dim_sweep:
@@ -224,6 +303,9 @@ def main():
         return
     if args.class_sweep:
         class_sweep()
+        return
+    if args.memory:
+        memory_report(args.classes)
         return
 
     from transformers import AutoModel, AutoProcessor

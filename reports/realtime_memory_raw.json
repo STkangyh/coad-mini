@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-02T08:48:59+00:00",
+    "git_commit": "2ba7a8b79958a44695e7c472db257e282e4c102e",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "ev/bench_realtime_incremental.py",
+      "src/models/fecam_head.py",
+      "reports/realtime_memory_raw.json"
+    ],
+    "script": "dev/bench_realtime_incremental.py",
+    "argv": [
+      "--memory"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "rss_mb": {
+    "imports": 210.86208,
+    "with_clip": 469.827584,
+    "with_head": 703.070208,
+    "live_rss": true
+  },
+  "served_head_components_bytes": {
+    "means": 4194304,
+    "counts": 2048,
+    "cov_sum": 33554432,
+    "precision": 33554432,
+    "sd": 16384,
+    "mean_cache": 1573632
+  },
+  "by_pooling": {
+    "mean": {
+      "dim": 512,
+      "ram_mb": 5.643008,
+      "checkpoint_mb": 1.573888
+    },
+    "chunks4": {
+      "dim": 2048,
+      "ram_mb": 72.895232,
+      "checkpoint_mb": 12.587008
+    },
+    "chunks3_adjdiff": {
+      "dim": 2560,
+      "ram_mb": 112.089856,
+      "checkpoint_mb": 18.3552
+    }
+  }
+}

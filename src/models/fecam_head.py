@@ -200,16 +200,29 @@ class FeCAMHead:
         """
         if self._cov_cache is None:
             d = self.feature_dim
+            # Written to reuse a couple of DxD buffers rather than let each
+            # expression allocate its own. The straightforward form churned
+            # through >10 of them, and at D=2048 that is ~340 MB the allocator
+            # does not hand back -- see reports/memory_footprint_result.md.
             raw = self._cov_sum / max(self._cov_n, 1)
-            diag_mean = float(np.trace(raw)) / d
-            off = raw - np.diag(np.diag(raw))
-            off_mean = float(off.sum()) / (d * (d - 1))
-            cov = raw + SHRINK_1 * diag_mean * np.eye(d) + SHRINK_2 * off_mean * (1 - np.eye(d))
+            diag = np.diag(raw).copy()
+            diag_mean = float(diag.sum()) / d
+            off_mean = float(raw.sum() - diag.sum()) / (d * (d - 1))
+
+            cov = raw + off_mean * SHRINK_2                  # off-diagonal shift
+            cov[np.diag_indices(d)] = diag + SHRINK_1 * diag_mean   # diagonal term
             sd = np.sqrt(np.diag(cov))
-            prec = np.linalg.inv(cov / np.outer(sd, sd))
-            # Sampling covariance of a class mean is raw/n; measured in the same
-            # sd-scaled metric the scores use.
-            penalty = float(np.trace(prec @ (raw / np.outer(sd, sd))))
+
+            inv_sd = 1.0 / sd
+            cov *= inv_sd[:, None]                           # in place: corr = cov/outer(sd,sd)
+            cov *= inv_sd[None, :]
+            prec = np.linalg.inv(cov)
+
+            # tr(P @ Sigma_scaled) without forming the product: tr(AB) = sum(A*B.T),
+            # which is O(D^2) instead of O(D^3) and allocates nothing DxD.
+            raw *= inv_sd[:, None]
+            raw *= inv_sd[None, :]
+            penalty = float(np.einsum("ij,ji->", prec, raw))
             self._cov_cache = (prec, sd, penalty)
         return self._cov_cache
 
@@ -350,7 +363,11 @@ class FeCAMHead:
             cov = np.zeros((d, d), dtype=np.float64)
             iu = np.triu_indices(d)
             cov[iu] = z["cov_tri"]
-            head._cov_sum = cov + np.triu(cov, 1).T      # mirror, diagonal once
+            # Mirror in place. `cov + np.triu(cov, 1).T` is clearer but allocates
+            # two more DxD arrays, which at D=2048 is 67 MB the allocator keeps.
+            il = (iu[1], iu[0])
+            cov[il] = cov[iu]
+            head._cov_sum = cov
         else:
             head._cov_sum = z["cov_sum"]                 # legacy full matrix
         head._cov_n = int(z["cov_n"])
