@@ -241,11 +241,11 @@ def test_enrollment_reuses_the_precision_matrix():
     X, y, _ = make_clusters(n_classes=4, n_per=30)
     h = FeCAMHead(feature_dim=D, max_classes=16)
     h.observe(X, y)
-    prec_before, sd_before = h._cov_terms()
+    prec_before, sd_before, _ = h._cov_terms()
 
     h.observe(RNG.standard_normal((3, D)), np.full(3, 9), update_cov=False)
     h.scores(X[:2])
-    prec_after, sd_after = h._cov_terms()
+    prec_after, sd_after, _ = h._cov_terms()
 
     assert prec_after is prec_before and sd_after is sd_before
 
@@ -303,3 +303,61 @@ def test_scores_cache_invalidated_by_new_enrollment():
     assert h.n_classes == 4
     assert np.all(S[:, 5] > -1e17), "newly enrolled class must be scorable"
     assert S.argmax(axis=1).tolist() == [5] * 10
+
+
+def test_few_shot_correction_is_a_noop_when_counts_are_equal():
+    """The correction adds penalty/n_c per class, so with equal n it is a constant
+    shift of every score -- the argmax, and hence every balanced benchmark number,
+    must be untouched."""
+    X, y, _ = make_clusters(n_classes=5, n_per=30)
+    off = FeCAMHead(D, 8)
+    on = FeCAMHead(D, 8, few_shot_correction=True)
+    for h in (off, on):
+        h.observe(X, y)
+    Xq = RNG.standard_normal((40, D))
+    np.testing.assert_array_equal(off.scores(Xq).argmax(axis=1),
+                                  on.scores(Xq).argmax(axis=1))
+
+
+def test_few_shot_correction_lifts_an_undersampled_class():
+    """With unequal counts it must favour the class that had fewer examples,
+    which is the whole point -- otherwise a 5-clip enrollment is penalised for
+    being new rather than for being wrong."""
+    X, y, protos = make_clusters(n_classes=3, n_per=60)
+    off = FeCAMHead(D, 8)
+    on = FeCAMHead(D, 8, few_shot_correction=True)
+    few = protos[0] + 0.15 * RNG.standard_normal((4, D))     # 4 examples vs 60
+    for h in (off, on):
+        h.observe(X, y)
+        h.observe(few, np.full(4, 7), update_cov=False)
+
+    q = protos[0] + 0.15 * RNG.standard_normal((30, D))
+    s_off, s_on = off.scores(q), on.scores(q)
+
+    # The 4-example class gains more than the 60-example ones, by exactly the
+    # ratio of their counts -- that is the correction's defining behaviour.
+    gain_few = (s_on[:, 7] - s_off[:, 7]).mean()
+    gain_base = (s_on[:, :3] - s_off[:, :3]).mean()
+    assert gain_few > gain_base > 0
+    assert gain_few / gain_base == pytest.approx(60 / 4, rel=1e-6)
+
+    # Base classes all shift by the same amount, so their ranking is preserved.
+    np.testing.assert_array_equal(s_off[:, :3].argmax(axis=1), s_on[:, :3].argmax(axis=1))
+    # And the undersampled class wins more often than before.
+    assert (s_on.argmax(axis=1) == 7).sum() > (s_off.argmax(axis=1) == 7).sum()
+
+
+def test_few_shot_correction_survives_a_save_load_round_trip(tmp_path):
+    X, y, _ = make_clusters(n_classes=3, n_per=30)
+    h = FeCAMHead(D, 8, few_shot_correction=True)
+    h.observe(X, y)
+    p = tmp_path / "h.npz"
+    h.save(p)
+    loaded = FeCAMHead.load(p)
+    assert loaded.few_shot_correction is True
+    # and a checkpoint written before the flag existed defaults to off
+    import numpy as _np
+    legacy = tmp_path / "legacy.npz"
+    _np.savez_compressed(legacy, feature_dim=D, max_classes=8, means=h.means,
+                         counts=h.counts, cov_sum=h._cov_sum, cov_n=h._cov_n)
+    assert FeCAMHead.load(legacy).few_shot_correction is False

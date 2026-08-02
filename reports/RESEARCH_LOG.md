@@ -559,6 +559,44 @@ SSv2는 바닥이 chance의 2.5배뿐이라 우리가 **4.5배**를 만든다. *
 **chunks4 이득이 backprop 분류기에서도 재현.** SSv2 linear probe 16.80 → 24.61(+7.81)로
 FeCAM(+7.82)과 거의 동일 → "표현 수준 개선"이 학습형 분류기까지 확장 검증됐다.
 
+## 2026-07-31 · 등록 클래스와 공분산 — 감사 9
+📄 [`enrollment_covariance_result.md`](enrollment_covariance_result.md) · [`run_enrollment_covariance.py`](../dev/run_enrollment_covariance.py)
+
+**질문:** `enroll_class`가 `update_cov=False`라 등록 클래스가 공유 공분산에 영원히 기여하지
+않는다. 해로운가?
+
+**답: 아니다.** few-shot 등록(데모의 실제 경로)에서 공분산을 갱신했을 때의 이득이
+**SSv2 +0.00, UCF101 +0.07~0.33**. 공유 공분산은 전역 통계라 클래스 몇 개로는 안 움직인다
+(실시간 §6의 "역행렬 800프레임 미갱신 = 0.25%p"와 같은 성질). → **설계가 정당했다.**
+
+### ⭐ 대신 훨씬 큰 걸 발견 — few-shot 등록 자체가 구조적으로 불리하다
+
+5클립 등록 클래스 정확도가 **SSv2 0.14%**. 원인은 공분산이 아니라 **표본 수 비대칭**:
+
+| 등록 샘플 | 5 | 10 | 25 | 50 | 100 | base |
+|---|---|---|---|---|---|---|
+| UCF101 | **66.4** | 80.0 | 87.5 | 90.3 | 91.9 | 92.7 |
+| SSv2 | **0.14** | 0.92 | 5.72 | 13.70 | 25.10 | 33.2 |
+
+base와 같은 수를 주면 동등해진다. **심각도는 클래스 구별성에 좌우** — UCF101은 base의 72%로
+쓸 만하고, SSv2는 0.4%로 사용 불가.
+
+### 편향에 닫힌 형태가 있고, 보정을 넣었다(opt-in)
+
+E[(x−m̂)′P(x−m̂)] = 참거리 + **tr(P·Σ)/n**. 합성 데이터로 1/n 형태 확인. 이 항을 되돌리면:
+
+| | enrolled | base | overall |
+|---|---|---|---|
+| UCF101 5-shot | 66.4 → **83.2** | −0.6 | **+2.4** |
+| SSv2 5-shot | 0.14 → 9.5 | −8.5 | −3.3 |
+
+**분리 가능하면 이득, 겹치면 base를 내준다.** 그래서 `few_shot_correction=True` opt-in,
+기본 off.
+
+**결정적 성질 — 균등 표본에서 정확히 no-op:** 모든 n이 같으면 전 클래스에 같은 상수를 더하므로
+argmax 불변. SSv2(100/class 균등)에서 **argmax 변화 0/4,702, 비트 동일**. UCF101(72~121)도
+10/3,783에 정확도 불변. → **보고된 벤치 수치가 하나도 영향받지 않는다.**
+
 ## 자체 감사 (2026-07-30) — 개선점 10 · 물음표 10
 
 논문화 전에 스스로 약점을 찾아본 것. **⚙️ = 코드/데이터로 확인함**, **💭 = 판단**.
@@ -575,7 +613,7 @@ FeCAM(+7.82)과 거의 동일 → "표현 수준 개선"이 학습형 분류기�
 | 6 | ~~**CI에서 테스트 실행**~~ ✅ **07-31 완료** | ⚙️ `tests.yml` 추가(push/PR, py3.11+3.13). **바로 값을 했다** — 격리 환경에서 테스트 1개가 실패해 과도한 비트-동일성 단정을 발견·수정 |
 | 7 | ~~**raw JSON에 git SHA·환경 메타데이터**~~ ✅ **07-31 완료** | ⚙️ `src/utils/provenance.py` — 11개 writer 전부 전환. **`dirty` 플래그가 핵심**(트리가 더러우면 SHA가 코드를 특정 못 함 — 07-27이 정확히 그 경우). 기존 15개는 출처를 지어내지 않고 **'NO PROVENANCE'로 표시** |
 | 8 | **app.py 분해** | ⚙️ 1,469줄, HTML/JS가 파이썬 문자열로 임베드 |
-| 9 | **등록 클래스의 공분산 문제 측정** | ⚙️ [`fecam_head.py:152`](../src/models/fecam_head.py) — `enroll_class`는 `update_cov=False`라 **48개 base로 추정한 공분산을 영구히 사용**. 사용자가 20개 등록하면? 미측정 |
+| 9 | ~~**등록 클래스의 공분산 문제 측정**~~ ✅ **07-31 완료** | ⚙️ **공분산은 무해**(few-shot 이득 +0.00~0.33). 대신 **few-shot 등록 자체가 표본 수 비대칭으로 불리**함을 발견(SSv2 5-shot 0.14%). 편향의 닫힌 형태 tr(PΣ)/n을 찾아 opt-in 보정 추가 |
 | 10 | **메모리를 상시 지표로** | 💭 RAM 수치가 `0.95GB` 하나뿐이고 그건 GRU 시절 것. D=2560이면 precision 행렬만 52MB |
 
 ### 물음표 (답을 모르는 것)
@@ -673,4 +711,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-26 | [ucf101_tcd_result.md](ucf101_tcd_result.md) · [flops_result.md](flops_result.md) · [meeting_script_0726.md](meeting_script_0726.md) |
 | 07-27 | [encoder_swap_result.md](encoder_swap_result.md) · [meeting_deck_notion.md](meeting_deck_notion.md) · [progress_since_2026-07-17.md](progress_since_2026-07-17.md) |
 | 07-30 | [ssv2_temporal_pooling_result.md](ssv2_temporal_pooling_result.md) · [realtime_incremental_result.md](realtime_incremental_result.md) |
-| 07-31 | [bounds_context_result.md](bounds_context_result.md) |
+| 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) |

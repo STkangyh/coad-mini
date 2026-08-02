@@ -104,7 +104,7 @@ class FeCAMHead:
     """Shared-covariance FeCAM classifier over frozen features."""
 
     def __init__(self, feature_dim: int, max_classes: int = 256,
-                 pooling: str = DEFAULT_POOLING):
+                 pooling: str = DEFAULT_POOLING, few_shot_correction: bool = False):
         if pooling not in POOLINGS:
             raise ValueError(f"unknown pooling {pooling!r}, expected one of {sorted(POOLINGS)}")
         self.feature_dim = int(feature_dim)
@@ -112,6 +112,9 @@ class FeCAMHead:
         # Only used by window_to_embedding: callers that pool externally and hand
         # over (N, feature_dim) vectors are unaffected by this setting.
         self.pooling = pooling
+        # See `scores`. Off by default: it is a no-op when every class has the
+        # same number of examples, and changing it alters live enrollment only.
+        self.few_shot_correction = bool(few_shot_correction)
         self.means = np.zeros((max_classes, feature_dim), dtype=np.float64)
         self.counts = np.zeros(max_classes, dtype=np.int64)
         self._cov_sum = np.zeros((feature_dim, feature_dim), dtype=np.float64)
@@ -189,17 +192,25 @@ class FeCAMHead:
 
     # ── scoring ──────────────────────────────────────────────────────────────
     def _cov_terms(self):
-        """Cached (precision, sd). Depends ONLY on the shared covariance."""
+        """Cached (precision, sd, mean_penalty). Depends ONLY on the covariance.
+
+        `mean_penalty` = tr(P @ Sigma_scaled), the constant in the few-shot
+        correction; see `scores`. It is cached here because it depends on exactly
+        the same inputs as the precision.
+        """
         if self._cov_cache is None:
             d = self.feature_dim
-            cov = self._cov_sum / max(self._cov_n, 1)
-            diag_mean = float(np.trace(cov)) / d
-            off = cov - np.diag(np.diag(cov))
+            raw = self._cov_sum / max(self._cov_n, 1)
+            diag_mean = float(np.trace(raw)) / d
+            off = raw - np.diag(np.diag(raw))
             off_mean = float(off.sum()) / (d * (d - 1))
-            cov = cov + SHRINK_1 * diag_mean * np.eye(d) + SHRINK_2 * off_mean * (1 - np.eye(d))
+            cov = raw + SHRINK_1 * diag_mean * np.eye(d) + SHRINK_2 * off_mean * (1 - np.eye(d))
             sd = np.sqrt(np.diag(cov))
-            corr = cov / np.outer(sd, sd)
-            self._cov_cache = (np.linalg.inv(corr), sd)
+            prec = np.linalg.inv(cov / np.outer(sd, sd))
+            # Sampling covariance of a class mean is raw/n; measured in the same
+            # sd-scaled metric the scores use.
+            penalty = float(np.trace(prec @ (raw / np.outer(sd, sd))))
+            self._cov_cache = (prec, sd, penalty)
         return self._cov_cache
 
     def _precision(self):
@@ -217,7 +228,7 @@ class FeCAMHead:
         at the D=2560 of the chunks3+adjdiff pooling -- past the 100 ms budget of
         a 10 fps loop on its own. See reports/realtime_incremental_result.md.
         """
-        prec, sd = self._cov_terms()
+        prec, sd, _ = self._cov_terms()
         active_now = np.where(self.counts > 0)[0]
 
         if self._mean_cache is not None:
@@ -255,6 +266,23 @@ class FeCAMHead:
         folded into 2x'Pm) so the result stays exact if P is not perfectly
         symmetric. Verified against the previous per-class loop on the real
         val set: max relative error 6e-15, argmax agreement 100%.
+
+        FEW-SHOT CORRECTION (opt-in, `few_shot_correction=True`). A class mean
+        estimated from n examples is noisy, and that noise inflates the measured
+        distance by exactly tr(P @ Sigma_scaled)/n in expectation -- so a class
+        taught from 5 clips is systematically penalised against one fitted on
+        100, independent of where it actually sits. Adding the term back removes
+        that bias.
+
+        It is an exact no-op when every class has the same n (the bump is then a
+        constant added to every score, leaving the argmax untouched), which is
+        why none of the balanced benchmark numbers move. Measured effect where
+        counts differ, 10 classes enrolled from 5 clips each
+        (reports/enrollment_covariance_result.md):
+            UCF101   enrolled 66.4 -> 83.2, base -0.6, overall +2.4
+            SSv2     enrolled  0.1 ->  9.5, base -8.5, overall -3.3
+        It helps when classes are separable and trades base accuracy away when
+        they are not, so the default stays off.
         """
         X = self._prep(X)
         prec, sd, active, mu, mu_prec, mu_quad = self._precision()
@@ -266,6 +294,9 @@ class FeCAMHead:
         x_quad = np.einsum("nd,nd->n", xs_prec, xs)           # (N,)  x' P x
         cross = xs_prec @ mu.T + xs @ mu_prec.T               # (N, K)
         S[:, active] = -(x_quad[:, None] - cross + mu_quad[None, :])
+        if self.few_shot_correction:
+            penalty = self._cov_terms()[2]
+            S[:, active] += penalty / self.counts[active]
         return S
 
     def predict_window(self, window: np.ndarray) -> tuple[int, float, np.ndarray]:
@@ -300,6 +331,7 @@ class FeCAMHead:
             means=self.means, counts=self.counts,
             cov_tri=self._cov_sum[iu].astype(np.float32),
             cov_n=self._cov_n, pooling=self.pooling,
+            few_shot_correction=self.few_shot_correction,
         )
 
     @classmethod
@@ -308,7 +340,9 @@ class FeCAMHead:
         # Checkpoints written before pooling was configurable are mean-pooled.
         # Honouring that keeps them servable instead of silently mixing poolings.
         pooling = str(z["pooling"]) if "pooling" in z.files else "mean"
-        head = cls(int(z["feature_dim"]), int(z["max_classes"]), pooling=pooling)
+        fsc = bool(z["few_shot_correction"]) if "few_shot_correction" in z.files else False
+        head = cls(int(z["feature_dim"]), int(z["max_classes"]), pooling=pooling,
+                   few_shot_correction=fsc)
         head.means = z["means"]
         head.counts = z["counts"]
         if "cov_tri" in z.files:
