@@ -1,0 +1,116 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-04T14:38:04+00:00",
+    "git_commit": "9738e8a264e9868016946e9c872a8a7e8994de57",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "data/features_ucf101_live_cache.npz",
+      "dev/run_live_query_sim.py",
+      "reports/live_query_sim_raw.json"
+    ],
+    "script": "dev/run_live_query_sim.py",
+    "argv": [
+      "--per-class",
+      "5",
+      "--seeds",
+      "0",
+      "1",
+      "2",
+      "--rebuild-cache"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "per_class": 5,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_subsample": 505,
+  "results": {
+    "mean": {
+      "per_seed": {
+        "curated": {
+          "base": [
+            0.9176470588235294,
+            0.9058823529411765,
+            0.9568627450980393
+          ],
+          "enrolled": [
+            0.82,
+            0.88,
+            0.86
+          ]
+        },
+        "live": {
+          "base": [
+            0.9058823529411765,
+            0.8784313725490196,
+            0.9333333333333333
+          ],
+          "enrolled": [
+            0.82,
+            0.88,
+            0.82
+          ]
+        }
+      },
+      "mean": {
+        "curated": {
+          "base": 0.926797385620915,
+          "enrolled": 0.8533333333333334
+        },
+        "live": {
+          "base": 0.9058823529411765,
+          "enrolled": 0.84
+        }
+      }
+    },
+    "chunks4": {
+      "per_seed": {
+        "curated": {
+          "base": [
+            0.9333333333333333,
+            0.9215686274509803,
+            0.9568627450980393
+          ],
+          "enrolled": [
+            0.78,
+            0.88,
+            0.82
+          ]
+        },
+        "live": {
+          "base": [
+            0.9215686274509803,
+            0.9019607843137255,
+            0.9411764705882353
+          ],
+          "enrolled": [
+            0.74,
+            0.88,
+            0.8
+          ]
+        }
+      },
+      "mean": {
+        "curated": {
+          "base": 0.9372549019607844,
+          "enrolled": 0.8266666666666667
+        },
+        "live": {
+          "base": 0.9215686274509803,
+          "enrolled": 0.8066666666666666
+        }
+      }
+    }
+  }
+}

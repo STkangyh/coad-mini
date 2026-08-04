@@ -399,6 +399,41 @@ PyCIL 저자는 Zhou Da-Wei · Wang Fu-Yun · Ye Han-Jia · Zhan De-Chuan (SCIS'
 
 ---
 
+# 국면 IV — 배포 경로 검증 (2026-08)
+
+## 2026-08-04 · 라이브 쿼리 윈도우가 벤치마크와 얼마나 다른가 — 물음표 4 재정의
+📄 [`live_query_sim_result.md`](live_query_sim_result.md) · [`run_live_query_sim.py`](../dev/run_live_query_sim.py)
+
+**질문의 전제가 틀렸었다.** 물음표 4는 원래 "실시간 few-shot 등록이 정확도로 이어지나"였는데,
+`app.py`를 직접 읽어보니 **`/enroll`은 파일 업로드고 업로드 영상도 `np.linspace`로 전체
+클립에 고르게 샘플링**한다 — 벤치마크와 완전히 같은 경로다. `enrollment_covariance_result.md`의
+수치는 근사가 아니라 **실제 경로 그 자체**였다.
+
+진짜 다른 건 **쿼리(`/predict_rt`)** 다. 브라우저는 200ms마다 캡처해 최근 16장을 ring buffer로
+유지하고(`static/index.html`), 이건 **base 클래스든 방금 등록한 클래스든 모든 예측**에 적용된다.
+그런데 우리가 보고한 모든 정확도는 **전체 클립에 고르게 펼친 curated 윈도우**로 쿼리한 값이다.
+UCF101 평균 클립 길이 7.2초(실측) 대비 3.2초짜리 라이브 윈도우는 동작의 절반이 안 되는 구간을
+임의의 시작점에서 담는다.
+
+**측정:** 학습/등록은 그대로 두고(이미 검증됨) 쿼리 쪽만 바꿨다. test 505개 영상을 다시
+디코딩해 브라우저와 같은 stride로 라이브 윈도우를 잘라내고(영상마다 fps가 25/29.97로 섞여
+있어 영상별로 stride 계산), curated와 나란히 채점.
+
+| pooling | base Δ(live−curated) | enrolled Δ |
+|---|---|---|
+| mean | **−2.09pp** (3시드 전부 음수, sd=0.82) | −1.33pp |
+| chunks4 | **−1.57pp** (3시드 전부 음수, sd=0.40) | −2.00pp |
+
+**base 하락은 노이즈가 아니다** — 3시드 전부 음수고 chunks4는 효과가 sd의 4배. **mean과
+chunks4가 비슷하게 떨어져서**, 원인이 "구간 위치(순서) 문제"가 아니라 **"동작의 일부만 보는
+정보량 손실"** 임을 시사한다. enrolled는 표본이 작아(시드당 10개) 노이즈가 크지만 방향은 같다.
+
+**판정:** 떨어지지만 무너지지 않는다. −1.5~2.1pp는 실재하는 소폭 할인이지 벤치마크 수치와
+질적으로 다른 시스템이라는 뜻은 아니다. 한계: 영상당 시작점 1개만 봤고(운 좋은/나쁜 타이밍의
+분산은 미측정), UCF101만 확인(SSv2 미확인), 캡처 화질 차이는 배제(프레임 선택만 격리).
+
+---
+
 ## 현재 상태 (2026-07-30 기준)
 
 **서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head
@@ -659,7 +694,7 @@ CLIP 259 MB가 남는다. 논문에서 "AI 글래스"를 말하려면 이 수치
 | 1 | **"증분 크기 불변"은 발견인가 항등식인가** | ⚙️ raw JSON에서 `last`가 세 증분 전부 **비트 단위 동일**(`0.8744382765001322`) — 순서 무관 합이라 최종 모델이 문자 그대로 같다. 리포트는 "구조적 성질"이라 정직하게 썼지만, TCD −2.70 / ESSENTIAL −1.80과 한 표에 놓으면 경쟁 우위로 읽힌다. 게다가 그들은 backbone을 학습하는 **다른 트랙** — PyCIL 비교에 붙인 트랙 주석이 여기도 필요 |
 | 2 | **UCF101 88.84에 CLIP 사전학습 오염은?** ◐ 정량화됨 | ⚙️ 07-31: **zero-shot만으로 69.13** — CLIP이 UCF101을 이미 상당히 안다. 오염 여부와 무관하게 **표에 zero-shot 병기 필수**. SSv2는 5.21(chance 2.08)로 대비됨 |
 | 3 | **ESSENTIAL 95.1과 "2위" 비교가 성립하나** | 💭 그쪽은 frozen CLIP + **학습형** temporal encoder + prompt, 우리는 학습 0. 같은 표에 두려면 학습 예산 열이 필요 |
-| 4 | **"39fps 실시간 학습"이 정확도로 이어지나** | ⚙️ 벤치는 **속도만** 잰다. 온라인 1윈도우 학습의 정확도는 stream-sim 한 조건(UCF101·D=512·800프레임)뿐이고, 데모의 실제 few-shot 등록 정확도는 측정된 적 없음 |
+| 4 | ~~**"39fps 실시간 학습"이 정확도로 이어지나**~~ ◐ **08-04 재정의·부분 완료** | ⚙️ 질문의 전제가 틀렸었다 — `/enroll`은 파일 업로드고 curated 샘플링을 쓰므로 **등록은 이미 벤치마크와 동일 경로**. 진짜 차이는 **쿼리**(`/predict_rt`의 200ms/16프레임 ring buffer)였고, 이는 base 클래스에도 적용됨. 실측: base **−1.5~2.1pp**(3시드 전부 일관, 노이즈 아님), enrolled −1.3~2.0pp(표본 작아 노이즈 큼). 상세: [`live_query_sim_result.md`](live_query_sim_result.md) |
 | 5 | **합성 프레임으로 잰 fps** | ⚙️ CLIP 인코딩은 입력 무관이라 무해하지만 카메라 디코딩·리사이즈가 빠져 있다 — 종단 주장인지 부분 주장인지 애매 |
 | 6 | **SSv2 나머지 18pp가 정말 학습형 encoder 몫인가** | 💭 23.6 vs ESSENTIAL baseline 42.1의 격차를 그렇게 귀속했으나 **우리 큐레이션·클래스 수**와 분리 안 됨. 07-31에 구조는 맞췄지만 **클래스 수는 여전히 불가**(48 vs 174) — 미해결 |
 | 7 | **48-class 큐레이션의 대표성** | 💭 8 stages × 6개를 사람이 골랐다. 랜덤 48개와 비교한 적이 없어 큐레이션이 결론을 만들었는지 알 수 없다 |
@@ -748,3 +783,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-27 | [encoder_swap_result.md](encoder_swap_result.md) · [meeting_deck_notion.md](meeting_deck_notion.md) · [progress_since_2026-07-17.md](progress_since_2026-07-17.md) |
 | 07-30 | [ssv2_temporal_pooling_result.md](ssv2_temporal_pooling_result.md) · [realtime_incremental_result.md](realtime_incremental_result.md) |
 | 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) · [memory_footprint_result.md](memory_footprint_result.md) |
+| 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
