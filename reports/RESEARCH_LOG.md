@@ -430,7 +430,43 @@ chunks4가 비슷하게 떨어져서**, 원인이 "구간 위치(순서) 문제"
 
 **판정:** 떨어지지만 무너지지 않는다. −1.5~2.1pp는 실재하는 소폭 할인이지 벤치마크 수치와
 질적으로 다른 시스템이라는 뜻은 아니다. 한계: 영상당 시작점 1개만 봤고(운 좋은/나쁜 타이밍의
-분산은 미측정), UCF101만 확인(SSv2 미확인), 캡처 화질 차이는 배제(프레임 선택만 격리).
+분산은 미측정), UCF101만 확인(→ 08-05에 SSv2도 프록시로 확인), 캡처 화질 차이는 배제(프레임
+선택만 격리).
+
+## 2026-08-05 · ⭐ SSv2: chunks4의 이득이 부분 관측에서 역전된다
+📄 [`partial_window_sim_result.md`](partial_window_sim_result.md) · [`run_partial_window_sim.py`](../dev/run_partial_window_sim.py)
+
+08-04의 "SSv2에서는 어떨까"를 이어받았다. **SSv2 원본 영상이 이 환경에 없어** 08-04와 같은
+재디코딩 실측이 불가능하다 — 대신 저장된 16장 curated 특징에서 **연속된 일부만 잘라내는
+프록시**를 썼다. UCF101이 실측(재디코딩)과 프록시를 둘 다 가진 유일한 벤치라 먼저 검증:
+coverage=0.44에서 프록시가 실측 대비 **15~35% 과소평가**한다(mean 프록시 −1.41 vs 실측
+−2.09, chunks4 −1.33 vs −1.57). 즉 아래 SSv2 수치는 하한선으로 읽어야 한다.
+
+**coverage를 낮출수록 (48클래스 전체 커리큘럼, 배포 설정 그대로):**
+
+| coverage | mean | chunks4 | chunks4−mean |
+|---|---|---|---|
+| 1.00(배포값) | 15.74% | **23.56%** | +7.82pp |
+| 0.50 | 14.64% | 17.05% | +2.41pp |
+| 0.44 | 14.48% | 16.44% | +1.96pp |
+| **0.25** | 13.71% | **13.45%** | **−0.26pp (역전)** |
+
+**chunks4의 SSv2 우위가 coverage 0.25에서 mean보다 나빠진다.** UCF101의 같은 계산은
+1.00→0.25에서 +1.49pp→+0.08pp로 줄기만 하고 역전은 없다(둘 다 static-biased라 순서
+정보가 애초에 작은 보너스였을 뿐이라서). 메커니즘: chunks4의 구간 위치는 "동작 전체의
+초반/중반/후반"을 인코딩하는데, 부분 윈도우에서는 그게 "우연히 잡힌 일부의 초반/중반/후반"이
+되어 **등록 시(전체를 본 프로토타입)와 쿼리 시(부분만 본 라이브 윈도우) 사이에 구간 의미가
+어긋난다** — 순서 정보가 도움이 아니라 잘못된 신호로 바뀐다. mean은 순서를 안 쓰니 이
+문제가 아예 없어 완만하게만 떨어진다.
+
+**한계 — 가장 중요한 것:** coverage=0.44는 UCF101 클립 길이(7.2초) 기준이다. **SSv2 클립이
+더 짧으면 실제 커버리지 비율은 더 클 수 있고**(하락이 덜 심각), 원본 영상 없이는 정확한 값을
+모른다. 역전이 일어나는 정확한 지점도 근사치다. 그럼에도 "chunks4가 mean보다 빠르게
+무너진다"는 방향성은 coverage sweep의 단조적 패턴과 UCF101 대비 두 신호가 일치해 견고하다.
+
+**판정:** 당장 pooling을 바꿀 근거는 아니지만(불확실성이 커서), **원본 영상 접근이 복구되면
+최우선으로 재현해야 할 실험**이 됐다. chunks4를 SSv2에서도 계속 쓸지, 부분 관측에 더
+강건한 변형(halves/thirds 등)을 따로 쓸지가 여기 달려 있다.
 
 ---
 
@@ -711,6 +747,10 @@ CLIP 259 MB가 남는다. 논문에서 "AI 글래스"를 말하려면 이 수치
 **막힌 것**
 - **HMDB51** — 공식 split 서버가 HTML을 반환, HF 미러는 영상만. split을 지어낼 수 없어 보류.
 - ~~**인코더 교체**~~ — MobileCLIP은 CPU에서 20배 느림. **Jetson 대여로 검증 경로가 생김**(아래).
+- **⭐ SSv2 원본 영상**(`COAD_VIDEO_DIR`) — 08-05에 새로 우선순위가 올라감: chunks4의 SSv2
+  이득(+7.83pp)이 부분 관측(라이브 쿼리 윈도우)에서 프록시 기준 coverage 0.25쯤에 역전됨을
+  발견했는데, **정확한 coverage 비율과 실제 하락폭은 원본 영상 없이는 확정 불가**
+  ([`partial_window_sim_result.md`](partial_window_sim_result.md)). 복구되면 최우선 재현 대상.
 
 **⭐ Jetson AGX Orin 대여 가능 — 막힌 항목 2개가 동시에 풀린다**
 
@@ -784,3 +824,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-30 | [ssv2_temporal_pooling_result.md](ssv2_temporal_pooling_result.md) · [realtime_incremental_result.md](realtime_incremental_result.md) |
 | 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) · [memory_footprint_result.md](memory_footprint_result.md) |
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
+| 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
