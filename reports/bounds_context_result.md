@@ -15,6 +15,15 @@ Generated: 2026-07-31. 스크립트: [`dev/run_bounds_context.py`](../dev/run_bo
 zero-shot은 CLIP의 이미지-텍스트 공동 공간이 필요해 mean 512-d로만 가능하다. 나머지는
 mean 512와 배포본 chunks4 2048 **양쪽**에서 재, pooling이 *학습형* 분류기에도 듣는지 함께 본다.
 
+**출처(2026-08-05 추가, 원문 PDF 직접 확인):** zero-shot과 linear probe를 나란히 놓고
+표현의 질을 평가하는 이 방식은 **CLIP 원논문**(Radford et al., 2021,
+[arXiv:2103.00020](https://arxiv.org/abs/2103.00020))의 핵심 평가 방법론이다. 서론에
+"We also confirm these findings with **linear-probe representation learning analysis**"라
+명시돼 있고, Figure 6은 "**Zero-shot CLIP outperforms few-shot linear probes**"이며,
+linear-probe 프로토콜만 다루는 전용 부록(A. Linear-probe evaluation)까지 있다. 다만 이
+인용은 사후에 붙인 것이다 — 처음 이 리포트를 쓸 때 원문을 참고하고 설계한 게 아니라,
+질문("88.7이 잘한 수치인가")에서 바로 이 구조로 갔다.
+
 ---
 
 ## 1. 결과
