@@ -1,0 +1,114 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-08T04:54:30+00:00",
+    "git_commit": "c81d41ebea0cb9bbe20c1082c39d6445ac04d612",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "ev/bench_realtime_incremental.py",
+      "reports/RESEARCH_LOG.md",
+      "reports/base_heavy_split_result.md",
+      "reports/partial_window_sim_result.md",
+      "reports/pycil_bridge_result.md",
+      "scripts/extract_clip_features.py",
+      "data/features_ssv2_live_cache.npz",
+      "data/subset/train_full.json",
+      "data/subset/val_full.json",
+      "dev/run_ap_fps_sweep.py",
+      "dev/run_ssv2_live_query_sim.py",
+      "dev/run_ssv2_tcd_full_split.py",
+      "reports/ap_fps_sweep_raw.json",
+      "reports/ap_fps_sweep_result.md",
+      "reports/realtime_stream_sim_ssv2_raw.json",
+      "reports/realtime_stream_sim_ucf101_mean_raw.json",
+      "reports/realtime_stream_sim_ucf101_raw.json",
+      "reports/ssv2_live_query_sim_raw.json",
+      "reports/ssv2_tcd_full_split_raw.json",
+      "reports/ssv2_video_access_result.md"
+    ],
+    "script": "dev/run_ssv2_tcd_full_split.py",
+    "argv": [
+      "--seeds",
+      "0",
+      "1",
+      "2",
+      "--skip-gru",
+      "--pooling",
+      "chunks4"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "pooling": "chunks4",
+  "summary": {
+    "fecam_avg_inc": 0.20802943816277045,
+    "fecam_last": 0.17779948711686408
+  },
+  "per_seed": {
+    "fecam": [
+      {
+        "avg_inc": 0.20534897445850003,
+        "last": 0.17779948711686408,
+        "per_session": [
+          0.23541298307653447,
+          0.22813345356176737,
+          0.21756117622866544,
+          0.21080171930480285,
+          0.20577679029225773,
+          0.20752637379940167,
+          0.19821533060269164,
+          0.18979396916359667,
+          0.18246846143841852,
+          0.17779948711686408
+        ],
+        "train_s": 222.39240612485446
+      },
+      {
+        "avg_inc": 0.20857213016353993,
+        "last": 0.17779948711686408,
+        "per_session": [
+          0.252722208153963,
+          0.24574926320562232,
+          0.2279951100244499,
+          0.21671597633136094,
+          0.2029059829059829,
+          0.19780394653087205,
+          0.19469026548672566,
+          0.18724989650890023,
+          0.18208916537065836,
+          0.17779948711686408
+        ],
+        "train_s": 224.96446183416992
+      },
+      {
+        "avg_inc": 0.2101672098662714,
+        "last": 0.17779948711686408,
+        "per_session": [
+          0.2619410569105691,
+          0.2463931469792606,
+          0.2264801297648013,
+          0.21311475409836064,
+          0.2057571112246636,
+          0.1980760132471219,
+          0.19756705261615126,
+          0.18757781159219808,
+          0.1869655351127235,
+          0.17779948711686408
+        ],
+        "train_s": 218.45024458388798
+      }
+    ],
+    "gru_agem": []
+  }
+}

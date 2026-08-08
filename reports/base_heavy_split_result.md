@@ -8,6 +8,12 @@ Generated: 2026-07 (auto). 배경: TCD(Park et al., ICCV 2021)는 SSv2 전체(17
 구조적 변수(base-heaviness)를 우리 48-class subset에 이식해 테스트. 상세 배경은
 `reports/sota_positioning_brief.md` §1(f).)
 
+**리터럴 재현 업데이트(2026-08-06):** SSv2 원본 영상을 확보해 174클래스 전체·84 base +
+9×10 incremental(TCD의 실제 스케일)로 다시 검증했다 —
+[`ssv2_video_access_result.md §8`](ssv2_video_access_result.md). 결론은 그대로다: FeCAM이
+3시드 전부에서 GRU+A-GEM을 이겼다(avg_inc +3.78pp, last +2.97pp) — 여기 48클래스 근사가
+낸 결론이 리터럴 스케일에서도 뒤집히지 않았다. 원본은 그대로 두고 이 문단만 추가함.
+
 ## 설정
 
 우리 48클래스(8-stage×6class 큐레이션, 기존 실험과 동일 순서)를 두 가지 base-heavy

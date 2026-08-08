@@ -470,6 +470,98 @@ coverage=0.44에서 프록시가 실측 대비 **15~35% 과소평가**한다(mea
 
 ---
 
+## 2026-08-06 · SSv2 원본 영상 확보 — 막혔던 항목 4개 해소
+
+📄 [`ssv2_video_access_result.md`](ssv2_video_access_result.md)
+
+Qualcomm 공식 배포처에서 19.4GB 직접 다운로드(220,847개 webm 전량, `COAD_VIDEO_DIR` 설정
+완료). 위 08-05 항목이 최우선으로 지목했던 블로커가 해소됨. 파생 작업 4개:
+
+1. **live_query_sim 실측 재현** — 프록시가 예측했던 "coverage 0.25 근처 역전"은 **실전에서
+   안 일어남**. 실측 coverage=0.664(UCF101의 0.44보다 훨씬 큼 — SSv2가 더 짧고 12fps라서),
+   그 지점에서 chunks4가 mean보다 여전히 +2.91pp 앞섬. 배포 설정(chunks4) 유지 근거 확정.
+2. **174클래스 전체 subset·특징 구축** — `train.json`/`labels.json`의 브래킷 표기 불일치
+   버그(전량 미스매치, 조용히 성공 종료됨) 하나 잡음.
+3. **TCD 84+90 리터럴 재현** — 48클래스 근사가 냈던 "FeCAM이 GRU+A-GEM에 안 진다" 결론이
+   174클래스 진짜 스케일에서도 3시드 전부 유지(avg_inc 우위 +3.78pp).
+4. **48클래스 특징 재추출 + provenance 스탬핑** — 기존 특징에 메타데이터가 전무했던 것
+   확인·해결. 부수 발견: SSv2 stream-sim이 "fps 메타데이터 없어 블록"이라던 이전 서술이
+   **틀렸음**을 코드 재확인으로 정정(실제로는 fps를 아예 안 쓰는 함수였음).
+
+---
+
+## 2026-08-06 · AP-FPS 24조합 스윕 — 배포 조합이 Pareto인가
+
+📄 [`ap_fps_sweep_result.md`](ap_fps_sweep_result.md)
+
+backbone(clip_b32/openclip_l14) × pooling(mean/chunks4/chunks3_adjdiff) × head(NCM/SLDA/
+Ridge-RLS/FeCAM) 24조합을 mAP·FPS 평면에 처음으로 동시에 올림 — 이전엔 축마다 따로
+최적화해왔음(pooling은 정확도로, head는 pooling 고정 후, 속도는 배포 조합 하나만).
+
+- **측정 아티팩트 발견·수정:** FeCAM 원시 점수(음의 마할라노비스 거리)는 샘플별 오프셋
+  편차가 ~1176인데 행 내부 편차는 4~14뿐 — macro AP가 이 오프셋에 오염돼 FeCAM을
+  최하위(0.028)로 잘못 보고했다(정확도는 최고인데). 행 z-score 정규화로 수정 후
+  0.028→0.215(7.7배), **모든 head·pooling 조합에서 FeCAM이 1위**로 뒤집힘.
+- **FPS는 backbone이 99% 결정** — pooling·head를 아무리 바꿔도 안 움직임(D=3840까지도).
+- **10fps 예산이 openclip_l14를 전부 탈락시킴**(4.8fps) — 예산 안에서 최선은 여전히
+  clip_b32+FeCAM, **현재 배포 조합이 정당화됨**.
+- chunks3+adjdiff가 val에서 근소 우위를 보이지만 **배포 변경 근거 아님**(단일 실행,
+  held-out 프로토콜에서는 원래 통계적 동률).
+
+## 2026-08-08 · CIFAR-100 PTM 문헌 대조 — PyCIL 실제 모델과의 비교는 SSv2가 아닌 여기서
+
+📄 [`pycil_bridge_result.md §5`](pycil_bridge_result.md)
+
+**질문:** SSv2 스윕을 "다른 모델들과 비교"해달라는 요청 → PyCIL을 SSv2에 직접 붙이는 방안
+검토했으나 **PyCIL은 비디오 데이터셋 미지원**(DataManager가 CIFAR/ImageNet 전용)이라 큰
+엔지니어링 비용 필요. 대신 **문헌 수치 대조**로 방향 잡고, 이미 CIFAR-100·PyCIL split으로
+FeCAM을 검증해둔 07-22 리포트에 이어 붙임 — SSv2가 아니라 CIFAR-100이 겹치는 지점이라서.
+
+SimpleCIL/APER([arXiv:2303.07338](https://arxiv.org/abs/2303.07338)), RanPAC
+([arXiv:2307.02251](https://arxiv.org/abs/2307.02251)), ACIL
+([arXiv:2205.14922](https://arxiv.org/abs/2205.14922)) 원문 PDF를 직접 받아 표 수치 확인:
+
+| method | 트랙 | CIFAR-100 avg / last |
+|---|---|---|
+| SimpleCIL | frozen ViT-B/16-IN21K (우리와 동일 트랙) | 87.57 / 81.26 |
+| APER w/ Adapter | 〃 + adapter 미세조정 | 90.65 / 85.15 |
+| RanPAC | 〃 + PETL + random projection | — / 92.2(last만 보고) |
+| **FeCAM(우리)** | **frozen CLIP B/32** | **76.9 / 73.3** |
+| ACIL (다른 트랙) | ResNet-32 from-scratch backprop 후 analytic 증분 | 66.3(5-phase) |
+
+- **같은 트랙 안에서 우리가 제일 낮다** — 단 backbone이 다르다(CLIP B/32 vs ViT-B/16-IN21K).
+  `ap_fps_sweep_result.md`가 SSv2에서 "속도는 backbone이 결정"이라 낸 것과 같은 결로,
+  **정확도 축에서도 backbone이 가장 레버리지 큰 선택**이라는 게 문헌으로 확인됨.
+- **⭐ 세 논문 다 FPS/latency를 전혀 안 보고함** — 원문 전체 검색해도 없음. `pycil_survey_edge_gap.md`가
+  CIL 분야 전반에 지적한 시간 미측정 공백이 PTM-frozen 트랙 대표 논문 3편에서도 그대로
+  재확인됨. **문헌과의 속도 비교 자체가 불가능** — 이 축을 실측하는 것 자체가 이 프로젝트의
+  차별점.
+- ACIL은 트랙이 달라(backprop base 필요) 직접 비교하지 않음(`pycil_bridge_result.md §4`
+  트랙 분리 원칙 그대로 적용).
+
+## 2026-08-08 · ESSENTIAL과 직접 비교 — 정확도 절반 이하, 메모리는 근소 우위
+
+📄 [`ssv2_video_access_result.md §9`](ssv2_video_access_result.md)
+
+§8의 174클래스 TCD 84+9×10 인프라에 배포 설정 그대로(chunks4, few_shot_correction=True)
+FeCAM을 얹어 ESSENTIAL(ICCV'25, 구조적으로 가장 가까운 선행연구)과 직접 비교:
+
+| | avg_inc | last |
+|---|---|---|
+| ESSENTIAL (10×9, 원문) | **48.9%** | 47.5% |
+| 우리 FeCAM(chunks4) | 20.8% | 17.8% |
+
+**정확도는 우리가 절반 이하 — 스핀 없이 그대로 기록.** 반대로 **메모리는 근소하게 우리가
+작다**(체크포인트 8.17MiB vs ESSENTIAL 8.4~8.6MiB). 해석: ESSENTIAL의 학습형 temporal
+encoder+cross-attention이 backprop으로 실제 상당한 정보를 더 뽑아낸다는 뜻 —
+`bounds_context_result.md`의 "backprop이 사는 건 1%p 미만"은 **같은 표현 위에서 선형
+분류기와 비교했을 때**의 얘기고, **표현 자체를 학습형 temporal 모듈로 바꾸는 것**은
+전혀 다른 축임을 이 결과가 보여준다. 한계: 84/90 무작위 분할, ESSENTIAL의 정확한
+CLIP variant·프레임 수 미확인, ESSENTIAL은 sparse exemplar를 쓰는 반면 우리는 완전
+0-메모리.
+
+---
+
 ## 현재 상태 (2026-07-30 기준)
 
 **서빙 구성:** frozen CLIP ViT-B/32 → chunks4 pooling(2048-d) → FeCAM shared-cov head
@@ -489,7 +581,7 @@ coverage=0.44에서 프록시가 실측 대비 **15~35% 과소평가**한다(mea
 |---|---|---|---|
 | SSv2 48-class | task-aware 6-way | **0.498** | |
 | UCF101 (TCD 프로토콜) | avg inc | 90.00 | 구 변형(chunks3+adjdiff) 기준 — 재측정 필요 |
-| CIFAR-100 (PyCIL split) | avg inc | 0.769 | 교차 검증용 |
+| CIFAR-100 (PyCIL split) | avg inc | 0.769 | 문헌 SimpleCIL 0.876·RanPAC 0.922(last) 대비 낮음 — backbone 차이(§08-08) |
 | 실시간 | 학습+예측 | **39.4 fps** | CPU, 10 fps 예산의 25% |
 | 학습 비용 | fit only | **42 ms** | GRU+A-GEM 대비 6,400배↓ |
 
@@ -747,9 +839,13 @@ CLIP 259 MB가 남는다. 논문에서 "AI 글래스"를 말하려면 이 수치
 **막힌 것**
 - **HMDB51** — 공식 split 서버가 HTML을 반환, HF 미러는 영상만. split을 지어낼 수 없어 보류.
 - ~~**인코더 교체**~~ — MobileCLIP은 CPU에서 20배 느림. **Jetson 대여로 검증 경로가 생김**(아래).
-- **⭐ SSv2 원본 영상**(`COAD_VIDEO_DIR`) — 08-05에 새로 우선순위가 올라감: chunks4의 SSv2
-  이득(+7.83pp)이 부분 관측(라이브 쿼리 윈도우)에서 프록시 기준 coverage 0.25쯤에 역전됨을
-  발견했는데, **정확한 coverage 비율과 실제 하락폭은 원본 영상 없이는 확정 불가**
+- ~~**SSv2 원본 영상**~~ — **08-06 해결.** Qualcomm 공식 배포처에서 19.4GB 직접 다운로드
+  (`COAD_VIDEO_DIR` 설정 완료, 220,847개 webm 전량 확보). 프록시가 우려했던 coverage 0.25
+  근처 역전은 실측 결과 **일어나지 않음**(실제 coverage=0.664, chunks4가 live 조건에서도
+  mean보다 +2.91pp 앞섬) — [`ssv2_video_access_result.md`](ssv2_video_access_result.md).
+  174클래스 전체·84 base + 9×10 incremental(TCD 리터럴 스케일)로 FeCAM vs GRU+A-GEM도
+  재검증 완료 — FeCAM이 3시드 전부 승리(avg_inc +3.78pp), 48클래스 근사 결론이 그대로
+  유지됨 ([`ssv2_video_access_result.md §8`](ssv2_video_access_result.md)).
   ([`partial_window_sim_result.md`](partial_window_sim_result.md)). 복구되면 최우선 재현 대상.
 
 **⭐ Jetson AGX Orin 대여 가능 — 막힌 항목 2개가 동시에 풀린다**
@@ -775,9 +871,10 @@ CLIP 259 MB가 남는다. 논문에서 "AI 글래스"를 말하려면 이 수치
 JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 
 **미실행 (우선순위 순)**
-1. **공분산 갱신 주기 튜닝** — D=2560에서 공분산 갱신은 325 ms(예산 초과). 평균은 매 프레임,
-   역행렬은 가끔 갱신하는 운용이 자연스러운데, 주기가 정확도에 미치는 영향은 UCF101 800프레임·D=512
-   한 조건에서만 확인됨.
+1. ~~**공분산 갱신 주기 튜닝**~~ — **08-08 해소.** 배포 pooling(D=2048/2560) 4개 조합
+   전부 실측: 정확도 손실 1pp 미만(−0.37~+0.62pp), 속도는 12.5~17.8배 향상 — D=512에서
+   냈던 결론이 실제 배포 차원에서도 유지됨. `never` 운용 시 인코더 포함 17~23fps로 예산
+   충분. ([`ssv2_video_access_result.md §10`](ssv2_video_access_result.md))
 2. **차원 축소와 결합** — 2560-d 공분산은 크다. random projection/PCA로 줄이면 더 많은 구간을 쓸 수 있을지도.
 3. **AUC-A / AUC-L 채택** — PyCIL 서베이의 메모리-불가지론 지표.
 4. **BudgetCL 방식의 iteration-budget 프로토콜**.
@@ -825,3 +922,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 07-31 | [bounds_context_result.md](bounds_context_result.md) · [enrollment_covariance_result.md](enrollment_covariance_result.md) · [memory_footprint_result.md](memory_footprint_result.md) |
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
+| 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |

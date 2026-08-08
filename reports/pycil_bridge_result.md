@@ -63,7 +63,73 @@ Mahalanobis 루프) — 통계 축적(학습) 자체는 초 단위.
 - PyCIL 고전 baseline의 **본 실행**(160-200 epoch × ResNet)은 이 노트북에서 비실용적
   → 스모크로 파이프라인만 검증했고, 본 수치는 CUDA 머신에서 동일 config로 실행 예정.
 
-## 5. 재현
+## 5. ⭐ 문헌 대조 (2026-08-08 추가) — PTM-frozen 트랙 SOTA와 나란히
+
+**질문:** SSv2 AP/FPS 스윕([`ap_fps_sweep_result.md`](ap_fps_sweep_result.md))을 만들면서
+"다른 모델들과 비교해달라"는 요청이 있었다. PyCIL의 실제 모델(SimpleCIL/ACIL/APER 등)을
+SSv2에 직접 돌리는 방안도 검토했으나, **PyCIL은 비디오 데이터셋을 지원하지 않고**
+(`DataManager`가 CIFAR/ImageNet 이미지 전용 — SSv2용 어댑터를 새로 짜야 해서 엔지니어링
+비용이 큼), SSv2에서의 직접 실행은 보류하고 **문헌 수치 대조**로 방향을 잡았다. 그러면 이
+비교는 SSv2가 아니라 **이 리포트가 이미 다루는 CIFAR-100**에서 해야 앞뒤가 맞는다 — PTM
+계열 논문(SimpleCIL/APER, RanPAC)이 실제로 보고하는 벤치마크가 CIFAR-100이기 때문.
+
+**출처(원문 PDF 직접 확인, 표절대 재인용 아님):**
+- SimpleCIL/APER — Zhou et al., *Revisiting CIL with Pre-Trained Models*
+  ([arXiv:2303.07338](https://arxiv.org/abs/2303.07338)), Table 1
+- RanPAC — McDonnell et al. ([arXiv:2307.02251](https://arxiv.org/abs/2307.02251)), Table 1
+- ACIL — Zhuang et al., NeurIPS 2022 ([arXiv:2205.14922](https://arxiv.org/abs/2205.14922)), §IV-C
+
+### 5.1 결과 — PTM-frozen 트랙 (우리와 같은 트랙, CIFAR-100)
+
+| method | backbone | Ā(avg inc) | 마지막 태스크 |
+|---|---|---|---|
+| SimpleCIL | ViT-B/16-IN21K, frozen | 87.57% | 81.26% |
+| APER w/ Adapter (최고 변형) | 〃 + adapter 미세조정 | 90.65% | 85.15% |
+| RanPAC | ViT-B/16-IN21K + PETL + random projection | — | **92.2%**\* |
+| **FeCAM (우리, 위 §2)** | **frozen CLIP ViT-B/32** | **76.9%** | **73.3%** |
+
+\* RanPAC 논문 Table 1은 **마지막 태스크 정확도만** 보고한다(원문 §5.2 "we report final
+accuracy, A_T, in the main paper" — 확인함). SimpleCIL/APER처럼 avg/last를 병기하지 않으므로
+직접 그 열에만 놓았다.
+
+**해석:** 우리 FeCAM(76.9/73.3)은 이 표에서 가장 낮다. 그런데 조건이 동일하지 않다 —
+① 우리 backbone은 **CLIP ViT-B/32**(512-d), 저들은 **ViT-B/16-IN21K**(768-d, ImageNet-21K
+지도학습 사전학습) — 백본 자체가 다르다. ② 프로토콜도 다르다: 우리는 b0=50/inc=10(6task),
+저들은 B0Inc5(20task, 첫 태스크부터 5클래스). 태스크가 잘게 쪼개질수록 초반 클래스 수가
+적어 두 표의 숫자는 **직접 뺄셈 비교 대상이 아니다.** ③ RanPAC·APER는 **PETL로 소량
+파라미터를 튜닝**한다(완전한 backprop-free가 아님) — 우리·SimpleCIL만 순수 backprop-free.
+
+**그럼에도 남는 사실:** SimpleCIL이 우리 FeCAM보다 순수 "frozen + 통계 head" 조건에서
+CIFAR-100을 10%p 이상 앞선다. 이건 **ViT-B/16-IN21K가 CLIP B/32보다 CIFAR류 자연 이미지에
+더 잘 맞는 표현을 준다**는 뜻일 가능성이 높다(IN21K 지도학습이 CIFAR100의 상위 카테고리와
+더 가까운 반면, CLIP은 웹 캡션 대조학습이라 다른 분포). **이건 head의 문제가 아니라
+backbone 선택의 문제**라는 걸 문헌이 보여준다 — [`ap_fps_sweep_result.md §3`](ap_fps_sweep_result.md)
+이 SSv2에서 "속도는 backbone이 결정한다"고 한 것과 같은 결의 결론이 정확도 축에서도 나온
+셈: **backbone이 이 파이프라인에서 가장 레버리지가 큰 선택이다.**
+
+### 5.2 참고용 — 다른 트랙 (ACIL, 직접 비교 금지)
+
+| method | backbone | 학습 방식 | CIFAR-100 Ā |
+|---|---|---|---|
+| ACIL (5-phase) | ResNet-32, **from-scratch backprop 기반 학습 후** analytic 증분 | base task는 SGD 160epoch | 66.30% |
+| ACIL (25-phase) | 〃 | 〃 | 65.95% |
+
+ACIL은 **base task를 ResNet-32로 처음부터 backprop 학습**(160 epoch)한 뒤에만 analytic
+증분이 붙는다 — "backprop-free"라는 이름값과 달리 base 단계는 무거운 학습이 필요하다.
+frozen web-pretrained 표현만 쓰는 우리·SimpleCIL·RanPAC과는 **완전히 다른 트랙**이라
+§5.1과 나란히 놓지 않았다(`pycil_bridge_result.md §4`가 이미 세운 원칙 그대로 적용).
+
+### 5.3 ⭐ 속도 비교는 문헌으로 불가능하다
+
+SimpleCIL/APER, RanPAC, ACIL **세 논문 모두 원문 전체를 검색했지만 FPS·inference
+latency·ms/frame 수치가 단 하나도 없다** — "training time"이라는 정성적 언급(그림 반경
+등)만 있을 뿐, 표로 정리된 속도 수치는 전무하다. 이건 이미 `pycil_survey_edge_gap.md`가
+CIL 분야 전반에 대해 지적한 것과 정확히 같은 공백이다 — **CIL 문헌은 정확도만 보고하고
+시간·에너지는 거의 안 잰다.** 그래서 이 세션의 [`ap_fps_sweep_result.md`](ap_fps_sweep_result.md)
+같은 AP-vs-FPS 스윕을 문헌과 나란히 놓을 방법 자체가 없다 — 속도 축에서는 비교 대상이
+없다는 것 자체가, 우리가 이 축을 실측한다는 것의 상대적 가치를 보여준다.
+
+## 6. 재현
 
 ```bash
 ./benchmarks/pycil/setup_pycil.sh                      # PyCIL + 패치

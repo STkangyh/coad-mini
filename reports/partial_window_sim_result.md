@@ -3,6 +3,14 @@
 Generated: 2026-08-05. 스크립트: [`dev/run_partial_window_sim.py`](../dev/run_partial_window_sim.py)
 원시결과: `reports/partial_window_sim_raw.json`
 
+**실측 업데이트(2026-08-06):** SSv2 원본 영상을 확보해 여기서 프록시로만 예측했던 걸
+실제 재디코딩으로 재현했다 — [`ssv2_video_access_result.md §7`](ssv2_video_access_result.md).
+결론: 실제 coverage는 0.44가 아니라 **0.664**였고(SSv2가 더 짧고 12fps라 §5의 추측대로
+과소평가였음), 그 지점에서는 **역전이 일어나지 않는다**(chunks4가 live 조건에서도
+mean보다 +2.91pp 앞섬). 아래 프록시 결과 자체(방향성·기울기)는 유효한 것으로 확인됐고,
+"역전 위험"이라는 해석만 실제 coverage를 몰라서 과장돼 있었다. 원본은 그대로 두고
+색인 성격으로 이 문단만 추가함.
+
 **질문:** [`live_query_sim_result.md`](live_query_sim_result.md)가 UCF101에서 실측한
 "라이브 쿼리 윈도우 = 벤치마크 대비 −1.5~2.1pp"가 **SSv2에서는 어떻게 될까?**
 

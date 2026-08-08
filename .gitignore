@@ -43,3 +43,4 @@ data/features_ucf101_b32/
 
 # Cached live-window features (dev/run_live_query_sim.py) — regenerable
 data/features_ucf101_live_cache.npz
+data/features_ssv2_live_cache.npz

@@ -34,6 +34,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from config import DATA_DIR, FEATURES_DIR, SUBSET_DIR, VIDEO_DIR
+from src.utils.provenance import provenance
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,8 @@ def parse_args():
     parser.add_argument("--num-frames", type=int, default=16)
     parser.add_argument("--splits", nargs="+", default=["train", "val"])
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--subset-suffix", default="mini",
+                        help="reads {split}_{suffix}.json, e.g. 'full' for the 174-class subset")
     return parser.parse_args()
 
 
@@ -150,6 +153,7 @@ def write_metadata(config: BackboneConfig, output_dir: Path, num_frames: int, fe
         "num_frames": num_frames,
         "feature_dim": feature_dim,
         "note": config.note,
+        "_meta": provenance(),
     }
     with open(output_dir / "feature_config.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -163,13 +167,14 @@ def process_split(
     device: str,
     num_frames: int,
     overwrite: bool,
+    subset_suffix: str = "mini",
 ) -> int | None:
     if VIDEO_DIR is None:
         raise RuntimeError(
             "COAD_VIDEO_DIR is not set. Point it to the Something-Something V2 video directory."
         )
 
-    src = SUBSET_DIR / f"{split}_mini.json"
+    src = SUBSET_DIR / f"{split}_{subset_suffix}.json"
     if not src.exists():
         print(f"[SKIP] {src} not found. Run create_mini_subset.py first.")
         return None
@@ -244,6 +249,7 @@ def main():
             device=device,
             num_frames=args.num_frames,
             overwrite=args.overwrite,
+            subset_suffix=args.subset_suffix,
         )
         feature_dim = feature_dim or split_dim
 

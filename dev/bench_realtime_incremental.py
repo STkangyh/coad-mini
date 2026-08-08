@@ -47,7 +47,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.models.fecam_head import POOLING_DIM_FACTOR, FeCAMHead  # noqa: E402
+from src.models.fecam_head import POOLING_DIM_FACTOR, FeCAMHead
+from src.models.fecam_head import POOLINGS as POOLING_FNS  # noqa: E402
 from src.utils.provenance import save_results  # noqa: E402
 
 N_FRAMES = 16
@@ -220,9 +221,40 @@ def class_sweep(dim=DIM, counts=(48, 101, 250, 500)):
 
 
 UCF_DIR = ROOT / "data/features_ucf101_b32"
+SSV2_DIR = ROOT / "data/features"
+
+# stream_sim was previously UCF101-only; --dataset ssv2 was assumed blocked on
+# missing fps/frame-count metadata (see ssv2_video_access_result.md), but that
+# assumption was wrong -- this function never touches fps or frame count at
+# all, it streams already-extracted mean-pooled feature vectors in random
+# order. The real blocker was just "never pointed at the SSv2 features dir",
+# which is now trivial to fix now that data/features/ has clean, provenance-
+# stamped SSv2 features (also true before this session, just not used here).
 
 
-def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0)):
+def _load_stream_samples(dataset, warm, stream, pooling="mean"):
+    need = warm + stream
+    if dataset == "ucf101":
+        man = json.loads((UCF_DIR / "manifest.json").read_text())
+        samples = man["splits"]["train"]["samples"]
+        feat_dir, max_classes = UCF_DIR / "train", 101
+    else:
+        samples = json.loads((ROOT / "data/subset/train_mini.json").read_text())
+        feat_dir, max_classes = SSV2_DIR / "train", 48
+    rng = np.random.default_rng(0)
+    rng.shuffle(samples)
+    pool_fn = POOLING_FNS[pooling]
+    X, y = [], []
+    for s in samples[:need]:
+        p = feat_dir / f"{s['id']}.npy"
+        if p.exists():
+            X.append(pool_fn(np.load(p).astype(np.float64)))
+            y.append(s["class_id"])
+    return np.stack(X).astype(np.float64), np.array(y), max_classes
+
+
+def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0), dataset="ucf101",
+              pooling="mean"):
     """Accuracy vs how often the covariance inverse is refreshed.
 
     The enroll path no longer needs the inverse at all, but a full update
@@ -230,32 +262,26 @@ def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0)):
     does not fit the budget (see --dim-sweep). So: how stale can the inverse get
     before accuracy suffers?
 
-    Prequential (test-then-train) on real UCF101 features, mean-pooled, streamed
-    one sample at a time. `period=0` means never refresh after the warm start.
+    Prequential (test-then-train) on real features (UCF101 or SSv2), pooled with
+    `pooling`, streamed one sample at a time. `period=0` means never refresh
+    after the warm start. Pooling matters here specifically because the
+    inverse's O(D^3) cost is where refresh-period staleness actually bites --
+    mean (D=512) barely notices any period, but the deployed chunks4 (D=2048)
+    and chunks3_adjdiff (D=2560) are where --dim-sweep found a full refresh can
+    blow the frame budget, so THIS is the condition that answers "how often
+    must we actually refresh," not the D=512 case alone.
     """
-    man = json.loads((UCF_DIR / "manifest.json").read_text())
-    samples = man["splits"]["train"]["samples"]
-    rng = np.random.default_rng(0)
-    rng.shuffle(samples)
-
-    need = warm + stream
-    X, y = [], []
-    for s in samples[:need]:
-        p = UCF_DIR / "train" / f"{s['id']}.npy"
-        if p.exists():
-            X.append(np.load(p).mean(axis=0))
-            y.append(s["class_id"])
-    X = np.stack(X).astype(np.float64)
-    y = np.array(y)
+    X, y, max_classes = _load_stream_samples(dataset, warm, stream, pooling)
     warm = min(warm, len(X) - 100)
-    print(f"UCF101 real features | warm start {warm}, then stream {len(X)-warm} "
-          f"one at a time (predict, then learn)\n")
+    dim = X.shape[1]
+    print(f"{dataset.upper()} real features | pooling={pooling} (D={dim}) | "
+          f"warm start {warm}, then stream {len(X)-warm} one at a time (predict, then learn)\n")
     print(f"{'covariance refresh':22s} {'accuracy':>9s} {'head ms/frame':>14s} {'head fps':>9s}")
     print("-" * 60)
 
     rows = {}
     for period in periods:
-        head = FeCAMHead(feature_dim=DIM, max_classes=101)
+        head = FeCAMHead(feature_dim=dim, max_classes=max_classes)
         head.observe(X[:warm], y[:warm])
         head.scores(X[:1])
         correct, t0 = 0, time.perf_counter()
@@ -275,7 +301,7 @@ def stream_sim(warm=3000, stream=800, periods=(1, 5, 20, 100, 0)):
         rows[label] = {"accuracy": acc, "ms_per_frame": dt}
         print(f"{label:22s} {100*acc:8.2f}% {dt:13.2f}ms {1000/dt:8.0f}")
 
-    out = ROOT / "reports/realtime_stream_sim_raw.json"
+    out = ROOT / f"reports/realtime_stream_sim_{dataset}_{pooling}_raw.json"
     save_results(out, rows)
     print(f"\nraw -> {out}")
 
@@ -288,7 +314,11 @@ def main():
     ap.add_argument("--dim-sweep", action="store_true",
                     help="head-only timings across the poolings we use")
     ap.add_argument("--stream-sim", action="store_true",
-                    help="accuracy vs covariance-refresh period on real UCF101")
+                    help="accuracy vs covariance-refresh period on real features")
+    ap.add_argument("--dataset", choices=["ucf101", "ssv2"], default="ucf101",
+                    help="which real features --stream-sim streams")
+    ap.add_argument("--pooling", choices=list(POOLING_FNS), default="mean",
+                    help="pooling for --stream-sim -- D scales the refresh cost")
     ap.add_argument("--class-sweep", action="store_true",
                     help="head cost vs number of enrolled classes")
     ap.add_argument("--memory", action="store_true",
@@ -299,7 +329,7 @@ def main():
         dim_sweep(args.classes)
         return
     if args.stream_sim:
-        stream_sim()
+        stream_sim(dataset=args.dataset, pooling=args.pooling)
         return
     if args.class_sweep:
         class_sweep()
