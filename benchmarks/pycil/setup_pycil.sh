@@ -43,6 +43,44 @@ src = m.read_text()
 if "import cuda_shim" not in src:
     m.write_text("import cuda_shim  # non-CUDA fallback (see benchmarks/pycil/)\n" + src)
     print("patched main.py (cuda_shim import)")
+
+# 4) upstream bug: the end-of-run accuracy matrix assumes #class-groups == #tasks,
+#    which only holds when init_cls == increment. With b0=50 inc=10 there are 6
+#    tasks but 10 class groups, so the write goes out of bounds and the run dies
+#    with "could not broadcast input array from shape (7,) into shape (6,)" AFTER
+#    all training/eval finished. Size the table by the real group count instead.
+t = pycil / "trainer.py"
+src = t.read_text()
+
+OLD = """        np_acctable = np.zeros([task + 1, task + 1])
+        for idxx, line in enumerate({v}):
+            idxy = len(line)
+            np_acctable[idxx, :idxy] = np.array(line)
+        np_acctable = np_acctable.T
+        forgetting = np.mean((np.max(np_acctable, axis=1) - np_acctable[:, task])[:task])"""
+
+NEW = """        n_tasks = len({v})
+        n_groups = max(len(line) for line in {v})
+        np_acctable = np.zeros([n_tasks, n_groups])
+        for idxx, line in enumerate({v}):
+            np_acctable[idxx, :len(line)] = np.array(line)
+        np_acctable = np_acctable.T
+        forgetting = np.mean(
+            (np.max(np_acctable, axis=1) - np_acctable[:, n_tasks - 1])[:n_groups - 1])"""
+
+n = 0
+for var in ("cnn_matrix", "nme_matrix"):
+    old, new = OLD.format(v=var), NEW.format(v=var)
+    if old in src:
+        src = src.replace(old, new, 1)
+        n += 1
+if n:
+    t.write_text(src)
+    print(f"patched trainer.py (accuracy-matrix sizing, {n} block(s))")
+elif "n_groups = max(len(line) for line in cnn_matrix)" in src:
+    print("trainer.py accuracy-matrix already patched")
+else:
+    print("NOTE: accuracy-matrix anchor not found; upstream may have changed")
 EOF
 cp "$HERE/cuda_shim.py" "$PYCIL/cuda_shim.py"
 

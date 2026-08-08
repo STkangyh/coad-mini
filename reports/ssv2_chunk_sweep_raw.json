@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "provenance": "unknown",
+    "note": "Predates provenance tracking (added 2026-07-31). The producing commit and working-tree state were not recorded, so these numbers cannot be tied to specific code. Re-run the script named in the corresponding report to regenerate with provenance."
+  },
+  "1": {
+    "dim": 512,
+    "avg_inc": 0.24192441497020198,
+    "last": 0.15737983836665248
+  },
+  "2": {
+    "dim": 1024,
+    "avg_inc": 0.32713185573364495,
+    "last": 0.22735006380263717
+  },
+  "3": {
+    "dim": 1536,
+    "avg_inc": 0.3391960457279378,
+    "last": 0.24053594215227564
+  },
+  "4": {
+    "dim": 2048,
+    "avg_inc": 0.3404813276372167,
+    "last": 0.23564440663547426
+  },
+  "6": {
+    "dim": 3072,
+    "avg_inc": 0.33571931143773426,
+    "last": 0.23415567843470864
+  },
+  "8": {
+    "dim": 4096,
+    "avg_inc": 0.3277771958468175,
+    "last": 0.23117822203317737
+  }
+}

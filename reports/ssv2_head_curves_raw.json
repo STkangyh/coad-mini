@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-02T02:27:59+00:00",
+    "git_commit": "6b5cfa85e28b990156412e17a6b9a1d0934d3016",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "enchmarks/pycil/run_analytic_cifar100.py",
+      "dev/bench_jetson.py",
+      "dev/bench_realtime_incremental.py",
+      "dev/run_base_heavy_split.py",
+      "dev/run_bounds_context.py",
+      "dev/run_ssv2_gru_curve.py",
+      "dev/run_ssv2_head_curves.py",
+      "dev/run_ssv2_pooling_protocol.py",
+      "dev/run_ssv2_temporal_pooling.py",
+      "dev/run_ucf101_gru_agem.py",
+      "dev/run_ucf101_tcd_protocol.py",
+      "reports/ssv2_head_curves_raw.json",
+      "reports/ssv2_temporal_pooling_raw.json",
+      "src/utils/provenance.py",
+      "tests/test_provenance.py"
+    ],
+    "script": "dev/run_ssv2_head_curves.py",
+    "argv": [
+      "--help"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "NCM prototype": {
+    "per_step": [
+      0.44166666666666665,
+      0.2808333333333333,
+      0.22023121387283237,
+      0.15836909871244637,
+      0.16051912568306012,
+      0.14824263038548752,
+      0.13749390541199416,
+      0.12377711612079965
+    ],
+    "avg_inc": 0.20889163627332752,
+    "last": 0.12377711612079965,
+    "fit_s": 0.12658633315004408
+  },
+  "Deep SLDA": {
+    "per_step": [
+      0.4633333333333333,
+      0.30916666666666665,
+      0.24566473988439305,
+      0.1759656652360515,
+      0.17076502732240437,
+      0.16326530612244897,
+      0.1523647001462701,
+      0.141429179072735
+    ],
+    "avg_inc": 0.2277443272230379,
+    "last": 0.141429179072735,
+    "fit_s": 0.18526812479831278
+  },
+  "FeCAM (shared cov)": {
+    "per_step": [
+      0.48,
+      0.3125,
+      0.253757225433526,
+      0.19313304721030042,
+      0.1919398907103825,
+      0.18310657596371882,
+      0.1635787420770356,
+      0.15737983836665248
+    ],
+    "avg_inc": 0.24192441497020198,
+    "last": 0.15737983836665248,
+    "fit_s": 0.37688595801591873
+  }
+}

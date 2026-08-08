@@ -194,12 +194,15 @@ ESSENTIAL과 동일 계보(frozen CLIP + 경량 모듈)이자, TCD 벤치에서 
   "for Something-Something V2, the performance for NME falls behind CNN... naïve
   averaging of the features from all frames may not be suitable." 우리 결론
   ("FeCAM > GRU")과 정면 충돌 가능성이 있어 **우리 48클래스를 같은 base-heavy 구조
-  (24:6=4배, 36:6=6배)로 재구성해 true class-IL 재평가**한 결과, **반전은커녕 격차가
-  더 벌어짐**(최종정확도 Δ: 균등 +0.052 → moderate +0.048 → aggressive **+0.073**,
-  FeCAM이 GRU+A-GEM의 거의 2배). **부수 발견**: GRU+A-GEM이 base 세션 직후 급락
-  (aggressive에서 −65%)하는데, 원인은 A-GEM의 replay 메모리가 stage당 고정 50개라
-  base 클래스가 많을수록 클래스당 exemplar가 급감하기 때문(8.33→1.39개/class) — FeCAM과
-  무관한 우리 A-GEM 구현 자체의 개선점으로 별도 확인. **차이의 원인도 원문으로 확정**:
+  (24:6=4배, 36:6=6배)로 재구성해 true class-IL 재평가**한 결과, **반전이 일어나지
+  않음**(최종정확도 Δ: 균등 +0.052 → moderate +0.054 → aggressive +0.045 — 구조를
+  바꿔도 격차가 대체로 일정). **부수 발견**: GRU+A-GEM이 base 세션 직후 급락
+  (aggressive에서 −58%)하는데, A-GEM의 replay 예산을 클래스 비례로 고쳐도 −65%→−58%
+  완화에 그쳐 **대부분은 예산이 아닌 로짓 쏠림** 때문으로 보임.
+  ⚠️ **2026-07-31 정정**: 이전 판은 "격차가 **+0.073**으로 더 벌어짐, FeCAM이 GRU의
+  거의 2배"라고 썼으나, 그건 replay가 세션당 고정 50개여서 36클래스 base가 클래스당
+  1.39개만 받은 **굶긴 baseline의 산물**이었다 → `base_heavy_split_result.md` 참조.
+  **차이의 원인도 원문으로 확정**:
   TCD의 NME는 SSv2로 실제 fine-tune되어 모션 정보를 담은 feature 위에서 계산되고,
   우리는 한 번도 SSv2로 학습되지 않은 frozen CLIP을 쓰므로 애초에 평균내 잃을 시간
   정보가 적다. 상세: `reports/base_heavy_split_result.md`.
@@ -265,11 +268,12 @@ TCD 원문(Table 2): 84-base+[10×9]/[5×18] split, exemplar 20개/class, 백본
 **ResNet-50+TSM을 ImageNet-init 후 SSv2로 CIL 내내 fine-tune** — NME가 CNN보다
 **−6.9~−8.0%p** 낮음(35.78/29.60 vs 28.88/21.63). 같은 base-heavy 구조(24:6=4배,
 36:6=6배)로 우리 48클래스를 재편해 true class-IL로 다시 평가한 결과, **반전이 안
-일어났고 오히려 격차가 더 벌어짐**(FeCAM−GRU 격차가 균등 +0.052 → aggressive
-**+0.073**으로 확대). 대신 **GRU+A-GEM 쪽이 base 세션 직후 −65% 급락**하는 걸
-발견했는데, 원인은 A-GEM의 고정 replay 예산(stage당 50개)이 base 클래스 수가
-늘수록 클래스당 exemplar를 급감시키기 때문(8.33→1.39개/class) — FeCAM의 강점과는
-별개인, 우리 A-GEM 구현의 개선 포인트로 확인. TCD와 결과가 다른 이유도 원문으로
+일어남**(FeCAM−GRU 격차가 균등 +0.052 → aggressive +0.045로, 구조를 바꿔도 대체로
+일정). 대신 **GRU+A-GEM 쪽이 base 세션 직후 −58% 급락**하는 걸 발견했다. replay 예산을
+클래스 비례로 바로잡아도(1.39 → 8.33개/class) −65%가 −58%로만 완화되므로 **급락의
+대부분은 예산이 아니라 backprop 계열의 로짓 쏠림**으로 보인다.
+⚠️ **2026-07-31 정정**: 이전 판의 "격차가 **+0.073**으로 확대"는 굶긴 baseline의
+산물이라 철회했다(`base_heavy_split_result.md`). TCD와 결과가 다른 이유도 원문으로
 확정됨: **TCD의 NME는 SSv2로 실제 fine-tune되어 모션 정보를 담은 feature 위에서
 계산되고, 우리는 한 번도 SSv2로 학습되지 않은 frozen CLIP을 쓰므로** 애초에
 평균내 잃을 시간 정보가 적음. 완전한 174-class 원본 재현만 영상 접근 복구 후 후속.
@@ -289,7 +293,7 @@ TCD 원문(Table 2): 84-base+[10×9]/[5×18] split, exemplar 20개/class, 백본
 9. ✅ **정밀 지표(precision/recall/F1/mAP)** — `reports/val_metrics_result.md`.
 10. ✅ **학습 세팅(initial vs continual)** — Stage1=6클래스 initial(replay 없음) : Stage2-8=42클래스 continual(growing A-GEM replay) = 1:7.
 11. ✅ **데모 앱 사용성 버그 수정** — OOD 배지가 기본 설정에선 `threshold=None`이라 **항상 미작동**이었음(사용해보다 발견). 앱 시작 시 자동 보정(real val feature 또는 Docker/Spaces용 synthetic fallback)으로 수정, calibration 유효성 검증(held-out ID FPR 4%≈목표 5%, feature-space OOD 42% 플래그). 회귀 테스트 추가.
-12. ✅ **TCD(ICCV'21) NME<CNN 반례 재검증** — base-heavy(4배/6배) 구조로 재평가해도 FeCAM 우위 유지·확대(+0.048/+0.073). GRU+A-GEM의 replay-dilution 취약점 별도 발견. (`reports/base_heavy_split_result.md`)
+12. ✅ **TCD(ICCV'21) NME<CNN 반례 재검증** — base-heavy(4배/6배) 구조로 재평가해도 **반전 없음**, FeCAM 우위가 구조와 무관하게 대체로 일정(+0.054/+0.045). GRU+A-GEM의 base 직후 급락도 발견했으나 replay 예산으로는 일부만 설명됨. (`reports/base_heavy_split_result.md`) — *2026-07-31 정정: 이전 판의 "우위 확대(+0.073)"는 굶긴 baseline 탓이라 철회.*
 
 ---
 

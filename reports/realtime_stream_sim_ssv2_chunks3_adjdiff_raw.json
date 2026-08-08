@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-08T07:01:51+00:00",
+    "git_commit": "c81d41ebea0cb9bbe20c1082c39d6445ac04d612",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "ev/bench_realtime_incremental.py",
+      "reports/RESEARCH_LOG.md",
+      "reports/base_heavy_split_result.md",
+      "reports/partial_window_sim_result.md",
+      "reports/pycil_bridge_result.md",
+      "scripts/extract_clip_features.py",
+      "data/features_ssv2_live_cache.npz",
+      "data/subset/train_full.json",
+      "data/subset/val_full.json",
+      "dev/run_ap_fps_sweep.py",
+      "dev/run_ssv2_live_query_sim.py",
+      "dev/run_ssv2_tcd_full_split.py",
+      "reports/ap_fps_sweep_raw.json",
+      "reports/ap_fps_sweep_result.md",
+      "reports/realtime_stream_sim_ssv2_chunks4_raw.json",
+      "reports/realtime_stream_sim_ssv2_raw.json",
+      "reports/realtime_stream_sim_ucf101_chunks3_adjdiff_raw.json",
+      "reports/realtime_stream_sim_ucf101_chunks4_raw.json",
+      "reports/realtime_stream_sim_ucf101_mean_raw.json",
+      "reports/realtime_stream_sim_ucf101_raw.json"
+    ],
+    "script": "dev/bench_realtime_incremental.py",
+    "argv": [
+      "--stream-sim",
+      "--dataset",
+      "ssv2",
+      "--pooling",
+      "chunks3_adjdiff"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "every frame": {
+    "accuracy": 0.3125,
+    "ms_per_frame": 470.9829872925184
+  },
+  "every 5": {
+    "accuracy": 0.31375,
+    "ms_per_frame": 115.63429125002585
+  },
+  "every 20": {
+    "accuracy": 0.3125,
+    "ms_per_frame": 48.97119026107248
+  },
+  "every 100": {
+    "accuracy": 0.3125,
+    "ms_per_frame": 30.54651151120197
+  },
+  "never": {
+    "accuracy": 0.30875,
+    "ms_per_frame": 26.533386458759196
+  }
+}

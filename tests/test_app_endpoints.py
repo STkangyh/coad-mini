@@ -60,3 +60,16 @@ def test_anomaly_threshold_auto_calibrated():
     assert app._gem_model is not None, "checkpoints must be ready for this test"
     assert app._anomaly_scorer.threshold is not None
     assert isinstance(app._anomaly_scorer.threshold, float)
+
+
+def test_ui_is_served_from_the_static_file():
+    """The page is a file on disk, not a string literal -- serving must match it
+    byte for byte, so editing static/index.html is the only way to change the UI."""
+    from pathlib import Path
+    import app as app_module
+
+    served = TestClient(app_module.app).get("/")
+    assert served.status_code == 200
+    on_disk = (Path(app_module.__file__).parent / "static" / "index.html").read_text()
+    assert served.text == on_disk
+    assert on_disk.lstrip().startswith("<!DOCTYPE html>")

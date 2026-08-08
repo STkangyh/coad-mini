@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "provenance": "unknown",
+    "note": "Predates provenance tracking (added 2026-07-31). The producing commit and working-tree state were not recorded, so these numbers cannot be tied to specific code. Re-run the script named in the corresponding report to regenerate with provenance."
+  },
+  "mean (baseline)": {
+    "dim": 512,
+    "avg_inc": 0.8884386275232745,
+    "last": 0.8744382765001322
+  },
+  "chunks3+adjdiff": {
+    "dim": 2560,
+    "avg_inc": 0.8999978600896158,
+    "last": 0.8860692572032778
+  }
+}

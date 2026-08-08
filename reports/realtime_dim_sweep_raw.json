@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "provenance": "unknown",
+    "note": "Predates provenance tracking (added 2026-07-31). The producing commit and working-tree state were not recorded, so these numbers cannot be tied to specific code. Re-run the script named in the corresponding report to regenerate with provenance."
+  },
+  "mean (deployed)": {
+    "predict": 0.05131659563630819,
+    "enroll": 0.10202911216765642,
+    "full": 9.876841586083174,
+    "dim": 512
+  },
+  "halves": {
+    "predict": 0.25339589919894934,
+    "enroll": 0.3792458912357688,
+    "full": 40.314433351159096,
+    "dim": 1024
+  },
+  "thirds": {
+    "predict": 0.49932925030589104,
+    "enroll": 1.3308541849255562,
+    "full": 102.07547475583851,
+    "dim": 1536
+  },
+  "chunks3+adjdiff (best SSv2)": {
+    "predict": 1.2860667891800404,
+    "enroll": 2.6547793997451663,
+    "full": 366.3536500185728,
+    "dim": 2560
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "provenance": "unknown",
+    "note": "Predates provenance tracking (added 2026-07-31). The producing commit and working-tree state were not recorded, so these numbers cannot be tied to specific code. Re-run the script named in the corresponding report to regenerate with provenance."
+  },
+  "device": "cpu",
+  "budget_ms": 100.0,
+  "n_classes": 48,
+  "dim": 512,
+  "stages_ms": {
+    "1. preprocess (PIL->tensor)": {
+      "mean": 3.4799500601366162,
+      "p50": 3.1455419957637787,
+      "p95": 6.850916892290115
+    },
+    "2. CLIP encode (batch=1)": {
+      "mean": 24.89623329602182,
+      "p50": 24.841499980539083,
+      "p95": 25.541500188410282
+    },
+    "3. ring-buffer mean-pool": {
+      "mean": 0.0025081681087613106,
+      "p50": 0.0024579931050539017,
+      "p95": 0.0029171351343393326
+    },
+    "4a. FeCAM observe (enroll)": {
+      "mean": 0.01036676112562418,
+      "p50": 0.010125106200575829,
+      "p95": 0.01191580668091774
+    },
+    "4b. FeCAM observe (full)": {
+      "mean": 0.24637077003717422,
+      "p50": 0.2465830184519291,
+      "p95": 0.26404205709695816
+    },
+    "5. FeCAM scores (no update)": {
+      "mean": 0.051391543820500374,
+      "p50": 0.051083043217659,
+      "p95": 0.05329190753400326
+    },
+    "5a. observe(enroll) + scores": {
+      "mean": 0.10227914899587631,
+      "p50": 0.10216701775789261,
+      "p95": 0.10325014591217041
+    },
+    "5b. observe(full) + scores": {
+      "mean": 9.04931251425296,
+      "p50": 9.128541219979525,
+      "p95": 12.016749940812588
+    },
+    "5c. -- DxD inverse alone": {
+      "mean": 7.738920906558633,
+      "p50": 8.574249921366572,
+      "p95": 9.639916941523552
+    }
+  },
+  "predict_only_ms": 28.430083068087697,
+  "learn_enroll_ms": 28.480970673263073,
+  "learn_full_ms": 37.42800403852016,
+  "encoder_share_pct": 87.41357021020889,
+  "head_share_pct": 0.35911398585825716
+}

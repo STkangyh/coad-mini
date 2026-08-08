@@ -22,6 +22,7 @@ RUN python -c "from transformers import CLIPModel, CLIPProcessor; \
 
 # App code + trained checkpoints (everything the server needs to run)
 COPY app.py config.py ./
+COPY static ./static
 COPY src ./src
 COPY checkpoints ./checkpoints
 

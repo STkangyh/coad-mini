@@ -26,8 +26,26 @@ class seen so far) at each session boundary, for both a mean-pool analytic head
 (FeCAM -- the TCD-era "NME-style" method) and our temporal GRU+A-GEM, to see
 whether the ordering flips the way TCD's NME-vs-CNN finding would predict.
 
-Run: python3 dev/run_base_heavy_split.py
+MEMORY BUDGET (added 2026-07-31, after a self-audit). The first version of this
+script gave A-GEM a FIXED 50 replay samples per session. That is the setting from
+the uniform 8x6 protocol, where it means 50/6 = 8.33 exemplars per class -- but a
+36-class base session still got 50, i.e. 1.39 per class. So the baseline was
+starved by exactly the variable under study, and the observed collapse (and part
+of FeCAM's widening lead) was partly an artifact of that rather than a property
+of base-heavy splits.
+
+Standard CIL practice budgets per class (TCD: 20/class on SSv2, 5/class on
+UCF101), so `--memory scaled` (now the default) keeps the original 8.33/class
+rate and sizes each session by its class count; a 6-class session still gets
+exactly 50, so the uniform protocol is unchanged. `--memory fixed` reproduces the
+old behaviour, and running both is what quantifies how much of the original
+finding survives.
+
+Run: python3 dev/run_base_heavy_split.py                  # scaled (fair)
+     python3 dev/run_base_heavy_split.py --memory fixed   # the old, starved run
+     python3 dev/run_base_heavy_split.py --memory both    # both, side by side
 """
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -45,12 +63,19 @@ from experiments.run_capacity_ablation import (
 from src.models.fecam_head import FeCAMHead
 from src.trainer import set_seed, train_epoch
 from src.utils.gem import AGEM
+from src.utils.provenance import save_results  # noqa: E402
 
 FEATURE_DIR = Path("data/features")   # CLIP B/32, already extracted for all 48 classes
 FEATURE_DIM = 512
 EPOCHS = 15
 SEEDS = [0, 1, 2]
 MAIN_CONFIG = ExperimentConfig("best_current_h256", hidden_dim=256)
+
+# The per-class replay rate implied by the original protocol: 50 samples for a
+# 6-class stage. Scaling by this keeps that protocol bit-identical while making
+# base-heavy sessions comparable instead of starved.
+CLASSES_PER_STAGE = 6
+EXEMPLARS_PER_CLASS = MEM_PER_STAGE / CLASSES_PER_STAGE      # 8.33
 
 # Our 48 classes are already grouped into 8 semantic stages of 6 (unchanged,
 # curriculum-curated order used everywhere else in this repo).
@@ -116,7 +141,14 @@ def eval_fecam_classIL(head: FeCAMHead, seen_classes, Xva, yva):
 
 
 # ── GRU + A-GEM over a session list ───────────────────────────────────────────
-def run_gru_agem(sessions, seed):
+def memory_for(cids, mode):
+    """Replay samples to keep from a session of len(cids) classes."""
+    if mode == "fixed":
+        return MEM_PER_STAGE                       # old behaviour, starves big sessions
+    return max(1, round(EXEMPLARS_PER_CLASS * len(cids)))
+
+
+def run_gru_agem(sessions, seed, mem_mode="scaled"):
     set_seed(seed)
     model = make_model(MAIN_CONFIG, FEATURE_DIM)
     criterion = nn.BCEWithLogitsLoss()
@@ -135,9 +167,12 @@ def run_gru_agem(sessions, seed):
                         criterion, optimizer, device, orth=gem)
         seen.extend(cids)
         accs.append(eval_gru_classIL(model, seen))
+        # Sized before storing, so this session's own class count decides its budget.
+        gem.mem_per_stage = memory_for(cids, mem_mode)
         gem.add_stage(session_train, FEATURE_DIR / "train", model=model, device=device)
     return {"avg_inc": float(np.mean(accs)), "last": accs[-1],
-            "per_session": accs, "train_s": time.perf_counter() - t0}
+            "per_session": accs, "train_s": time.perf_counter() - t0,
+            "mem_per_session": [memory_for(c, mem_mode) for c in sessions]}
 
 
 # ── FeCAM over a session list ──────────────────────────────────────────────────
@@ -166,45 +201,62 @@ def load_train_by_class():
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--memory", choices=["scaled", "fixed", "both"], default="both",
+                    help="replay budget: per-class (scaled), per-session (fixed, old)")
+    ap.add_argument("--out", default="reports/base_heavy_split_raw.json")
+    args = ap.parse_args()
+    modes = ["fixed", "scaled"] if args.memory == "both" else [args.memory]
+
     print(f"device: {device}  (GRU+A-GEM training; FeCAM is CPU-only regardless)")
+    print(f"replay budget mode(s): {modes}  "
+          f"(scaled = {EXEMPLARS_PER_CLASS:.2f} exemplars/class, the original rate)")
     Xtr_by_class = load_train_by_class()
     Xva, yva = load_val_features()
-
-    print(f"\n{'='*90}")
-    print(f"{'split':10s} {'method':16s} {'avg_inc':>8} {'last':>8} {'train_s':>8}  per-session")
-    print("=" * 90)
 
     results = {}
     for split_name, split in SPLITS.items():
         sessions = sessions_for(split)
         sizes = [len(s) for s in sessions]
-        print(f"\n[{split_name}] session sizes: {sizes}  "
+        print(f"\n{'='*94}")
+        print(f"[{split_name}] session sizes: {sizes}  "
               f"(base:increment = {sizes[0]//sizes[1]}x)")
+        print(f"{'method':26s} {'avg_inc':>8} {'last':>8} {'train_s':>8}  per-session")
+        print("-" * 94)
 
+        # FeCAM does not use replay at all, so it is identical across modes.
         r_fecam = run_fecam(sessions, Xtr_by_class, Xva, yva)
         curve = " ".join(f"{a:.3f}" for a in r_fecam["per_session"])
-        print(f"{split_name:10s} {'FeCAM':16s} {r_fecam['avg_inc']:8.3f} "
+        print(f"{'FeCAM (no replay)':26s} {r_fecam['avg_inc']:8.3f} "
               f"{r_fecam['last']:8.3f} {r_fecam['train_s']:8.2f}  {curve}", flush=True)
 
-        gru_runs = [run_gru_agem(sessions, seed) for seed in SEEDS]
-        avg_inc = np.mean([r["avg_inc"] for r in gru_runs])
-        last = np.mean([r["last"] for r in gru_runs])
-        train_s = np.mean([r["train_s"] for r in gru_runs])
-        curve = " ".join(f"{a:.3f}" for a in
-                          np.mean([r["per_session"] for r in gru_runs], axis=0))
-        print(f"{split_name:10s} {'GRU+A-GEM (3seed)':16s} {avg_inc:8.3f} "
-              f"{last:8.3f} {train_s:8.1f}  {curve}", flush=True)
-
-        results[split_name] = {"fecam": r_fecam, "gru_agem_mean": {
-            "avg_inc": float(avg_inc), "last": float(last),
-            "per_session": [float(x) for x in np.mean([r["per_session"] for r in gru_runs], axis=0)],
-        }, "gru_agem_seeds": gru_runs}
+        entry = {"fecam": r_fecam, "session_sizes": sizes}
+        for mode in modes:
+            gru_runs = [run_gru_agem(sessions, seed, mode) for seed in SEEDS]
+            avg_inc = float(np.mean([r["avg_inc"] for r in gru_runs]))
+            last = float(np.mean([r["last"] for r in gru_runs]))
+            train_s = float(np.mean([r["train_s"] for r in gru_runs]))
+            per_session = [float(x) for x in
+                           np.mean([r["per_session"] for r in gru_runs], axis=0)]
+            curve = " ".join(f"{a:.3f}" for a in per_session)
+            mem = gru_runs[0]["mem_per_session"]
+            print(f"{'GRU+A-GEM ' + mode + ' (3seed)':26s} {avg_inc:8.3f} "
+                  f"{last:8.3f} {train_s:8.1f}  {curve}   mem={mem}", flush=True)
+            print(f"{'  -> FeCAM lead':26s} "
+                  f"{r_fecam['avg_inc']-avg_inc:+8.3f} {r_fecam['last']-last:+8.3f}")
+            entry[f"gru_agem_{mode}"] = {
+                "avg_inc": avg_inc, "last": last, "per_session": per_session,
+                "mem_per_session": mem, "seeds": gru_runs,
+                "fecam_lead_avg_inc": r_fecam["avg_inc"] - avg_inc,
+                "fecam_lead_last": r_fecam["last"] - last,
+            }
+        results[split_name] = entry
 
     print("\nALL DONE")
     import json
     Path("reports").mkdir(exist_ok=True)
-    with open("reports/base_heavy_split_raw.json", "w") as f:
-        json.dump(results, f, indent=2)
+    save_results(args.out, results)
+    print(f"raw -> {args.out}")
 
 
 if __name__ == "__main__":

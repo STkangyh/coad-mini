@@ -21,6 +21,7 @@ Usage:
   python3 benchmarks/pycil/run_analytic_cifar100.py --init 10 --inc 10   # standard b0=10
 """
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -33,6 +34,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "external/PyCIL"))
 
 from src.models.fecam_head import FeCAMHead  # noqa: E402
+from src.utils.provenance import save_results  # noqa: E402
 
 FEAT_CACHE = REPO / "data/features_cifar100_b32"
 N_CLASSES = 100
@@ -200,11 +202,18 @@ def main():
     print(f"\nCIFAR-100 class-IL  b0={args.init} inc={args.inc}  "
           f"({len(tasks)} tasks, PyCIL seed={SEED} class order)")
     print(f"{'head':22s} {'avg_inc':>8} {'last':>8} {'train_s':>8}  per-task")
+    results = {"init": args.init, "inc": args.inc, "seed": SEED,
+               "n_tasks": len(tasks), "heads": {}}
     for head in [NCM(), SLDA(), make_fecam()]:
         r = run_head(head, tasks, Xtr, ytr, Xte, yte)
         curve = " ".join(f"{a:.3f}" for a in r["per_task"])
         print(f"{head.name:22s} {r['avg_inc']:8.3f} {r['last']:8.3f} "
               f"{r['train_s']:8.1f}  {curve}", flush=True)
+        results["heads"][head.name] = r
+
+    out = REPO / f"reports/pycil_bridge_b{args.init}_i{args.inc}_raw.json"
+    save_results(out, results)
+    print(f"raw -> {out}")
 
 
 if __name__ == "__main__":

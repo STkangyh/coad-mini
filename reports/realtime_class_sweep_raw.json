@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-02T02:53:47+00:00",
+    "git_commit": "6b5cfa85e28b990156412e17a6b9a1d0934d3016",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "enchmarks/pycil/run_analytic_cifar100.py",
+      "dev/bench_jetson.py",
+      "dev/bench_realtime_incremental.py",
+      "dev/run_base_heavy_split.py",
+      "dev/run_bounds_context.py",
+      "dev/run_ssv2_gru_curve.py",
+      "dev/run_ssv2_head_curves.py",
+      "dev/run_ssv2_pooling_protocol.py",
+      "dev/run_ssv2_temporal_pooling.py",
+      "dev/run_ucf101_gru_agem.py",
+      "dev/run_ucf101_tcd_protocol.py",
+      "reports/base_heavy_split_raw.json",
+      "reports/bounds_context_raw.json",
+      "reports/pycil_bridge_b50_i10_raw.json",
+      "reports/realtime_class_sweep_raw.json",
+      "reports/realtime_dim_sweep_raw.json",
+      "reports/realtime_incremental_raw.json",
+      "reports/realtime_stream_sim_raw.json",
+      "reports/ssv2_chunk_sweep_raw.json",
+      "reports/ssv2_gru_curve_raw.json"
+    ],
+    "script": "dev/bench_realtime_incremental.py",
+    "argv": [
+      "--class-sweep"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "48": {
+    "predict": 0.051512476056814194,
+    "enroll": 0.10230399202555418,
+    "full": 10.389333358034492
+  },
+  "101": {
+    "predict": 0.05888331215828657,
+    "enroll": 0.111362524330616,
+    "full": 9.278241777792573
+  },
+  "250": {
+    "predict": 0.07872909773141146,
+    "enroll": 0.3177957143634558,
+    "full": 9.837099723517895
+  },
+  "500": {
+    "predict": 0.3118665888905525,
+    "enroll": 0.2212708815932274,
+    "full": 10.27596676722169
+  }
+}

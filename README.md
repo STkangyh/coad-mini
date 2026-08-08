@@ -51,6 +51,11 @@ After A-GEM converged, we searched for the next bottleneck. **Data quantity domi
 
 Conclusion: a **simple GRU + A-GEM is the robust optimum**; scale data, not architecture. Reports: [openclip_l14](reports/openclip_l14_result.md) · [gru_attention](reports/gru_attention_result.md) · [data_scale](reports/data_scale_result.md). Full narrative: [docs/research_log.md](docs/research_log.md) §11.
 
+That conclusion is where the project *started*, not where it ended: dropping backprop entirely
+turned out to beat it on every metric, and the served model is now a FeCAM head on frozen CLIP.
+The whole arc, dated experiment by experiment, is in
+**[reports/RESEARCH_LOG.md](reports/RESEARCH_LOG.md)** — start there.
+
 ## Method overview
 
 The pipeline is:

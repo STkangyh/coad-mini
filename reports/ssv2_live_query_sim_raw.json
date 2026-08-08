@@ -1,0 +1,83 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-06T05:23:40+00:00",
+    "git_commit": "c81d41ebea0cb9bbe20c1082c39d6445ac04d612",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "ev/bench_realtime_incremental.py",
+      "scripts/extract_clip_features.py",
+      "data/features_ssv2_live_cache.npz",
+      "data/subset/train_full.json",
+      "data/subset/val_full.json",
+      "dev/run_ssv2_live_query_sim.py",
+      "reports/realtime_stream_sim_ssv2_raw.json",
+      "reports/realtime_stream_sim_ucf101_raw.json",
+      "reports/ssv2_video_access_result.md",
+      "scripts/create_ssv2_full_subset.py"
+    ],
+    "script": "dev/run_ssv2_live_query_sim.py",
+    "argv": [
+      "--per-class",
+      "10",
+      "--seeds",
+      "0",
+      "1",
+      "2"
+    ],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "per_class": 10,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_subsample": 480,
+  "mean_coverage": 0.663999596279423,
+  "results": {
+    "mean": {
+      "per_seed": {
+        "curated": [
+          0.1625,
+          0.1625,
+          0.1625
+        ],
+        "live": [
+          0.15208333333333332,
+          0.15208333333333332,
+          0.15208333333333332
+        ]
+      },
+      "mean": {
+        "curated": 0.1625,
+        "live": 0.15208333333333332
+      }
+    },
+    "chunks4": {
+      "per_seed": {
+        "curated": [
+          0.22708333333333333,
+          0.22708333333333333,
+          0.22708333333333333
+        ],
+        "live": [
+          0.18125,
+          0.18125,
+          0.18125
+        ]
+      },
+      "mean": {
+        "curated": 0.22708333333333333,
+        "live": 0.18125
+      }
+    }
+  }
+}
