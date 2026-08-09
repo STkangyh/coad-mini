@@ -490,23 +490,32 @@ Qualcomm 공식 배포처에서 19.4GB 직접 다운로드(220,847개 webm 전�
 
 ---
 
-## 2026-08-06 · AP-FPS 24조합 스윕 — 배포 조합이 Pareto인가
+## 2026-08-06 · AP-FPS 스윕 — 배포 조합이 Pareto인가 (08-08 두 차례 정정)
 
 📄 [`ap_fps_sweep_result.md`](ap_fps_sweep_result.md)
 
-backbone(clip_b32/openclip_l14) × pooling(mean/chunks4/chunks3_adjdiff) × head(NCM/SLDA/
-Ridge-RLS/FeCAM) 24조합을 mAP·FPS 평면에 처음으로 동시에 올림 — 이전엔 축마다 따로
-최적화해왔음(pooling은 정확도로, head는 pooling 고정 후, 속도는 배포 조합 하나만).
+pooling(mean/chunks4/chunks3_adjdiff) × head(NCM/SLDA/FeCAM) 9조합(clip_b32)을 mAP·FPS
+평면에 처음으로 동시에 올림 — 이전엔 축마다 따로 최적화해왔음(pooling은 정확도로, head는
+pooling 고정 후, 속도는 배포 조합 하나만).
 
 - **측정 아티팩트 발견·수정:** FeCAM 원시 점수(음의 마할라노비스 거리)는 샘플별 오프셋
   편차가 ~1176인데 행 내부 편차는 4~14뿐 — macro AP가 이 오프셋에 오염돼 FeCAM을
-  최하위(0.028)로 잘못 보고했다(정확도는 최고인데). 행 z-score 정규화로 수정 후
-  0.028→0.215(7.7배), **모든 head·pooling 조합에서 FeCAM이 1위**로 뒤집힘.
-- **FPS는 backbone이 99% 결정** — pooling·head를 아무리 바꿔도 안 움직임(D=3840까지도).
-- **10fps 예산이 openclip_l14를 전부 탈락시킴**(4.8fps) — 예산 안에서 최선은 여전히
-  clip_b32+FeCAM, **현재 배포 조합이 정당화됨**.
+  최하위로 잘못 보고했다(정확도는 최고인데). 행 z-score 정규화로 수정 후 **모든
+  head·pooling 조합에서 FeCAM이 1위**로 뒤집힘.
+- **FPS는 인코더가 95%+ 결정** — pooling·head를 아무리 바꿔도 39.4~41.6fps 범위 안,
+  전부 10fps 예산의 4배 가까운 여유. 이 스코프에선 fps가 결정을 제약하지 않는다.
 - chunks3+adjdiff가 val에서 근소 우위를 보이지만 **배포 변경 근거 아님**(단일 실행,
   held-out 프로토콜에서는 원래 통계적 동률).
+- **08-08 정정 ①:** head를 처음엔 4개(NCM/SLDA/Ridge-RLS/FeCAM)로 돌렸는데, 사용자 확인
+  없이 Ridge-RLS를 넣은 것이었다 — `cpu_friendly_methods_result.md`의 1세대 비교가
+  NCM/SLDA/Ridge였다가 FeCAM 도입 후 `ssv2_head_curves_result.md`(08-08에 뒤늦게 작성 —
+  전엔 스크립트·raw json만 있고 마크다운 리포트가 없었음)·`pycil_bridge_result.md`가
+  이미 Ridge를 빼고 NCM/SLDA/FeCAM 3개로 정착시킨 이력이 있었는데, 그걸 확인 안 하고
+  이미 은퇴한 head를 되살린 셈. Ridge 제외하고 재실행.
+- **08-08 정정 ②:** backbone도 원래 clip_b32/openclip_l14 2개(24→18조합)로 비교했는데,
+  L/14는 8배 느려(196ms vs 24ms) 10fps 예산 자체를 못 지켜 이 리포트의 질문("배포
+  조합이 Pareto인가")과 무관한 잡음이었다 — clip_b32 단독(9조합)으로 스코프를 좁힘.
+  결론(FeCAM 전승, fps는 인코더가 지배)은 두 정정 내내 그대로 유지됨.
 
 ## 2026-08-08 · CIFAR-100 PTM 문헌 대조 — PyCIL 실제 모델과의 비교는 SSv2가 아닌 여기서
 
@@ -923,3 +932,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
+| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) |
