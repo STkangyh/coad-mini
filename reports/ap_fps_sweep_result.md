@@ -88,7 +88,7 @@ pooling해서 채점한다. `fps = 1000 / (encode_1frame_ms + pool_ms + head_sco
 
 (정확도: mean 0.1574 / chunks4 0.2356 / chunks3+adjdiff 0.2471 — 순서는 mAP와 동일)
 
-![mAP vs fps 9조합 산점도 -- FeCAM(파랑)이 3개 pooling 전부에서 NCM/SLDA(회색)보다 위, fps는 39.4~41.6로 전부 10fps 예산 안](assets_ap_fps_sweep.png)
+![mAP vs fps(38.8~42.3로 확대) 9조합 산점도, 점마다 fps 라벨 표시 -- FeCAM(파랑)·SLDA(주황)·NCM(청록), FeCAM만 D가 커질수록 fps가 41.3→39.4로 눈에 띄게 처지고 NCM/SLDA는 41.3~41.6에 몰려 있음](assets_ap_fps_sweep.png)
 
 ## 3. FPS는 인코더가 지배하고, 9개 조합 전부 예산 안이다
 
