@@ -932,4 +932,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
-| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) |
+| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) |

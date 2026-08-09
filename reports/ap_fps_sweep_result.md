@@ -36,9 +36,10 @@ few-shot correction)이 모든 지표에서 더 낫다는 게 확인되면서 �
 [`ssv2_head_curves_result.md`](ssv2_head_curves_result.md)가 avg_inc
 NCM 0.209 < SLDA 0.228 < FeCAM 0.242로 이미 이 순서를 확인했고, `pycil_bridge_result.md`의
 CIFAR-100 브리지 실험(avg-inc NCM 0.698 < SLDA 0.725 < FeCAM 0.769)도 같은 순서다 —
-"공분산 구조를 얼마나 쓰는가"라는 하나의 사다리(공분산 없음 → 공유 공분산 → 공유
-공분산+정규화)를 한 단씩 대표하는 세 head로, 두 개 데이터셋에서 독립적으로 재현된
-순서다. 처음 이 스윕을 만들 때 이 히스토리를 확인 안 하고 Ridge-RLS를 다시 넣었다가,
+NCM(공분산 없음) < SLDA/FeCAM(둘 다 공유 공분산 사용, 정규화 방식이 다름 — 코드 확인
+결과 SLDA는 등방 shrinkage 0.01, FeCAM은 상관계수 기반 비대칭 shrinkage 1.0,
+`ssv2_head_curves_result.md §3` 참고)이 두 데이터셋에서 독립적으로 재현된 순서다. 처음
+이 스윕을 만들 때 이 히스토리를 확인 안 하고 Ridge-RLS를 다시 넣었다가,
 이미 은퇴시킨 head를 사용자 확인 없이 부활시킨 셈이 돼 빼고 다시 정리했다.
 
 **FPS 모델:** [`realtime_incremental_result.md`](realtime_incremental_result.md)가 확립한
@@ -128,9 +129,9 @@ pooling해서 채점한다. `fps = 1000 / (encode_1frame_ms + pool_ms + head_sco
 ## 6. 부수적 관찰 — head 순위가 pooling에 무관하게 고정된다
 
 **FeCAM > SLDA > NCM** 순서가 **3개 pooling 전부**에서 예외 없이 유지된다. §0에서 정리한
-"공분산 구조를 얼마나 쓰는가" 사다리(없음 → 공유 → 공유+정규화)가 pooling이 바뀌어도
-(정보량이 바뀌어도) **순서 자체는 안 흔들리는 안정적 성질**이라는 뜻 — pooling을 바꿔가며
-head를 재선택할 필요는 없다.
+"공분산을 쓰는가(SLDA/FeCAM) vs 안 쓰는가(NCM)"의 구분과, SLDA/FeCAM 사이의 정규화 방식
+차이가 pooling이 바뀌어도(정보량이 바뀌어도) **순서 자체는 안 흔들리는 안정적 성질**이라는
+뜻 — pooling을 바꿔가며 head를 재선택할 필요는 없다.
 
 ## 7. 정직한 한계
 

@@ -15,12 +15,15 @@ AXES
 
 Head choice is not arbitrary: it reuses the project's own established trio.
 cpu_friendly_methods_result.md's first generation compared NCM / SLDA / Ridge
-RLS; once FeCAM (shared covariance + shrinkage + few-shot correction) proved
-better on every metric, later comparisons (ssv2_head_curves_result.md,
-pycil_bridge_result.md) dropped Ridge and settled on NCM / SLDA / FeCAM --
-same "how much covariance structure helps" ladder (none -> shared -> shared
-+regularized), one head per rung. Ridge was added back here once without
-checking that history first; removed to match precedent.
+RLS; once FeCAM proved better on every metric, later comparisons
+(ssv2_head_curves_result.md, pycil_bridge_result.md) dropped Ridge and settled
+on NCM / SLDA / FeCAM. NCM alone skips covariance entirely; SLDA and FeCAM
+both use ONE shared covariance matrix, regularized differently, not "no
+regularization vs regularization" -- SLDA does isotropic shrinkage
+(shrink=1e-2 * I), FeCAM shrinks a correlation-normalized matrix with
+separate diagonal/off-diagonal constants (SHRINK_1=SHRINK_2=1.0), verified by
+reading both implementations rather than assumed. Ridge was added back here
+once without checking that history first; removed to match precedent.
 
 METRICS
   mAP     macro average precision over the full 48-way task.
