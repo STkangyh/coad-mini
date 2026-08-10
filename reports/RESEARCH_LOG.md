@@ -490,7 +490,7 @@ Qualcomm 공식 배포처에서 19.4GB 직접 다운로드(220,847개 webm 전�
 
 ---
 
-## 2026-08-06 · AP-FPS 스윕 — 배포 조합이 Pareto인가 (08-08 두 차례 정정)
+## 2026-08-06 · AP-FPS 스윕 — 배포 조합이 Pareto인가 (08-08 세 차례 정정)
 
 📄 [`ap_fps_sweep_result.md`](ap_fps_sweep_result.md)
 
@@ -515,7 +515,12 @@ pooling 고정 후, 속도는 배포 조합 하나만).
 - **08-08 정정 ②:** backbone도 원래 clip_b32/openclip_l14 2개(24→18조합)로 비교했는데,
   L/14는 8배 느려(196ms vs 24ms) 10fps 예산 자체를 못 지켜 이 리포트의 질문("배포
   조합이 Pareto인가")과 무관한 잡음이었다 — clip_b32 단독(9조합)으로 스코프를 좁힘.
-  결론(FeCAM 전승, fps는 인코더가 지배)은 두 정정 내내 그대로 유지됨.
+- **08-08 정정 ③:** "왜 top-1 대신 mAP를 주 지표로 썼냐"는 질문에 확인해보니 **근거가
+  없었다** — mAP 자체는 `dev/compute_val_metrics.py`가 이미 쓰던 지표라 없던 걸 새로
+  끌어온 건 아니지만, 이 프로젝트의 다른 모든 리포트는 정확도를 헤드라인으로 쓰는데
+  이 리포트만 mAP를 메인 축으로 쓴 데엔 기록된 이유가 없었다. 본문을 정확도 기준으로
+  재구성하고 mAP는 §6(측정 아티팩트 발견 경위)에 부차 지표로 내림. 세 정정 내내 결론
+  (FeCAM 전승, fps는 인코더가 지배, chunks4 유지가 맞음)은 그대로 유지됨.
 
 ## 2026-08-08 · CIFAR-100 PTM 문헌 대조 — PyCIL 실제 모델과의 비교는 SSv2가 아닌 여기서
 
@@ -959,4 +964,4 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
-| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) |
+| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) · [ssv2_accuracy_interpretation_result.md](ssv2_accuracy_interpretation_result.md) · [essential_trained_module_edge_feasibility_result.md](essential_trained_module_edge_feasibility_result.md) |
