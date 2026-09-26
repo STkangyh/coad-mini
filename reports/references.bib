@@ -1,0 +1,238 @@
+% Every entry below is the publisher's/venue's own BibTeX, copied verbatim.
+% Changes from the verbatim source, all notation-only (no content changed):
+%  (1) citation keys kept as the keys the manuscript's \cite commands use;
+%  (2) Crossref mojibake / HTML &-entities replaced with ASCII equivalents;
+%  (3) the long `abstract` field dropped from the two PMLR entries;
+%  (4) acronyms in titles brace-protected ({FeCAM}, {STSP}, ...) so the
+%      bibliography style does not lowercase them;
+%  (5) FeCAM: Bart\l omiej -> Bart{\l}omiej (bibtex split the name at the space
+%      and printed the initials "B. o.");
+%  (6) STSP: pages en dash -> "--" so the style prints "pp.";
+%  (7) OpenCLIP: dropped the README's "please cite it as below" note field.
+%  (8) CVF entries: DOI added from the IEEE Xplore record (Crossref, exact
+%      title match), and pages switched to that same IEEE record's
+%      pagination, since CVF open-access page numbers differ from IEEE's
+%      and a DOI must agree with the pages it is cited with;
+%  (9) UCF101: arXiv preprint DOI added (verified via DataCite).
+% (10) OpenCLIP: cited as release v2.0.0 (Zenodo version DOI 10.5281/zenodo.7083294,
+%      linked to GitHub tag v2.0.0), the first release that ships the
+%      laion2b_s32b_b82k ViT-L/14 weights used here (commit 28c9944, 2022-09-15).
+%      README's DOI 5143773 is the 2021 v0.1 record, and every Zenodo version's
+%      `version` field reads "v0.1", so it cannot identify the release.
+%      Entry type software -> misc + howpublished, since elsarticle-num has
+%      no software type and silently dropped publisher/version.
+% Sources:
+%   CVF Open Access page ...... park2021tcd, villa2022vclimb, lee2025essential,
+%                               pei2023stprompt, hayes2020slda, rebuffi2017icarl,
+%                               goyal2017ssv2, lin2019tsm
+%   PMLR page ................. radford2021clip, bertasius2021timesformer
+%   NeurIPS proceedings .bib .. wang2022sparcl, pei2022framemaker, goswami2023fecam,
+%                               schuhmann2022laion5b
+%   arXiv /bibtex ............. soomro2012ucf101
+%   IEEE Xplore (user-supplied) chen2025csta
+%   ACM DL export (user-supplied; HTML non-breaking-space entities -> space)
+%                               cheng2024stsp
+%   Crossref (publisher DOI metadata; ACM/IEEE export pages blocked)
+%                               zhao2021civc, zhou2024cilsurvey
+%   OpenCLIP GitHub README .... ilharco2021openclip
+
+@InProceedings{park2021tcd,
+    author    = {Park, Jaeyoo and Kang, Minsoo and Han, Bohyung},
+    title     = {Class-Incremental Learning for Action Recognition in Videos},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2021},
+    pages     = {13678-13687},
+    doi = {10.1109/ICCV48922.2021.01344}
+}
+
+@InProceedings{villa2022vclimb,
+    author    = {Villa, Andr\'es and Alhamoud, Kumail and Escorcia, Victor and Caba, Fabian and Alc\'azar, Juan Le\'on and Ghanem, Bernard},
+    title     = {{vCLIMB}: A Novel Video Class Incremental Learning Benchmark},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+    month     = {June},
+    year      = {2022},
+    pages     = {19013-19022},
+    doi = {10.1109/CVPR52688.2022.01845}
+}
+
+@inproceedings{zhao2021civc, series={MM '21}, title={When Video Classification Meets Incremental Classes}, url={http://dx.doi.org/10.1145/3474085.3475265}, DOI={10.1145/3474085.3475265}, booktitle={Proceedings of the 29th ACM International Conference on Multimedia}, publisher={ACM}, author={Zhao, Hanbin and Qin, Xin and Su, Shihao and Fu, Yongjian and Lin, Zibo and Li, Xi}, year={2021}, month=Oct, pages={880--889}, collection={MM '21} }
+
+@inproceedings{cheng2024stsp,
+author = {Cheng, Hao and Yang, Siyuan and Wang, Chong and Zhou, Joey Tianyi and Kot, Alex C. and Wen, Bihan},
+title = {{STSP}: Spatial-Temporal Subspace Projection for Video Class-Incremental Learning},
+year = {2024},
+isbn = {978-3-031-73389-5},
+publisher = {Springer-Verlag},
+address = {Berlin, Heidelberg},
+url = {https://doi.org/10.1007/978-3-031-73390-1_22},
+doi = {10.1007/978-3-031-73390-1_22},
+abstract = {Video class-incremental learning (VCIL) aims to learn discriminative and generalized feature representations for video frames to mitigate catastrophic forgetting. Conventional VCIL methods often retain a subset of frames or features from prior tasks as exemplars for subsequent incremental learning stages. However, these strategies overlook the connection between base and novel classes, sometimes even leading to privacy leakage. To address this challenge, we introduce a Spatial-Temporal Subspace Projection (STSP) scheme for VCIL. Specifically, we propose a discriminative Temporal-based Subspace Classifier (TSC) that represents each class with an orthogonal subspace basis and adopts subspace projection loss for classification. Unlike typical classification methods relying on fully connected layers, our TSC discerns the spatial-temporal dynamics in video content, thereby enhancing the representation of each video sample. Additionally, we implement inter- and intra-class orthogonal constraints into TSC, ensuring each class occupies a unique orthogonal subspace, defined by its basis. To prevent catastrophic forgetting, we further employ a Spatial-based Gradient Projection (SGP) strategy, adjusting network gradients to align with the null space of the spatial feature set from previous tasks. Extensive experiments conducted on three benchmarks, namely HMDB51, UCF101, and Something-Something V2, demonstrate that our STSP method outperforms state-of-the-art comparison methods, evidencing its efficacy in VCIL.},
+booktitle = {Computer Vision – ECCV 2024: 18th European Conference, Milan, Italy, September 29–October 4, 2024, Proceedings, Part XXVIII},
+pages = {374--391},
+numpages = {18},
+keywords = {Video action recognition, Class incremental learning, Subspace Projection, Gradient Projection},
+location = {Milan, Italy}
+}
+
+@ARTICLE{chen2025csta,
+  author={Chen, Tieyuan and Liu, Huabin and Hong Lim, Chern and See, John and Gao, Xing and Hou, Junhui and Lin, Weiyao},
+  journal={IEEE Transactions on Circuits and Systems for Video Technology},
+  title={{CSTA}: Spatial-Temporal Causal Adaptive Learning for Exemplar-Free Video Class-Incremental Learning},
+  year={2025},
+  volume={35},
+  number={11},
+  pages={11488-11501},
+  keywords={Knowledge engineering;Adaptation models;Circuits and systems;Training;Spatiotemporal phenomena;Integrated circuit modeling;Benchmark testing;Visualization;Transformers;Standards;Action recognition;class-incremental learning;causal inference},
+  doi={10.1109/TCSVT.2025.3579477}}
+
+@InProceedings{lee2025essential,
+    author    = {Lee, Jongseo and Bae, Kyungho and Min, Kyle and Park, Gyeong-Moon and Choi, Jinwoo},
+    title     = {{ESSENTIAL}: Episodic and Semantic Memory Integration for Video Class-Incremental Learning},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2025},
+    pages     = {17546-17556},
+    doi = {10.1109/ICCV51701.2025.01630}
+}
+
+@inproceedings{pei2022framemaker,
+ author = {Pei, Yixuan and Qing, Zhiwu and CEN, Jun and Wang, Xiang and Zhang, Shiwei and Wang, Yaxiong and Tang, Mingqian and Sang, Nong and Qian, Xueming},
+ booktitle = {Advances in Neural Information Processing Systems},
+ doi = {10.52202/068431-2248},
+ editor = {S. Koyejo and S. Mohamed and A. Agarwal and D. Belgrave and K. Cho and A. Oh},
+ pages = {31002--31016},
+ publisher = {Curran Associates, Inc.},
+ title = {Learning a Condensed Frame for Memory-Efficient Video Class-Incremental Learning},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2022/file/c8ac22c0d4b263618f2a4f4657948912-Paper-Conference.pdf},
+ volume = {35},
+ year = {2022}
+}
+
+@InProceedings{pei2023stprompt,
+    author    = {Pei, Yixuan and Qing, Zhiwu and Zhang, Shiwei and Wang, Xiang and Zhang, Yingya and Zhao, Deli and Qian, Xueming},
+    title     = {Space-time Prompting for Video Class-incremental Learning},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2023},
+    pages     = {11898-11908},
+    doi = {10.1109/ICCV51070.2023.01096}
+}
+
+@InProceedings{hayes2020slda,
+author = {Hayes, Tyler L. and Kanan, Christopher},
+title = {Lifelong Machine Learning With Deep Streaming Linear Discriminant Analysis},
+booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops},
+month = {June},
+year = {2020},
+pages = {887-896},
+doi = {10.1109/CVPRW50498.2020.00118}
+}
+
+@inproceedings{goswami2023fecam,
+ author = {Goswami, Dipam and Liu, Yuyang and Twardowski, Bart{\l}omiej and van de Weijer, Joost},
+ booktitle = {Advances in Neural Information Processing Systems},
+ doi = {10.52202/075280-0288},
+ editor = {A. Oh and T. Naumann and A. Globerson and K. Saenko and M. Hardt and S. Levine},
+ pages = {6582--6595},
+ publisher = {Curran Associates, Inc.},
+ title = {{FeCAM}: Exploiting the Heterogeneity of Class Distributions in Exemplar-Free Continual Learning},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2023/file/15294ba2dcfb4521274f7aa1c26f4dd4-Paper-Conference.pdf},
+ volume = {36},
+ year = {2023}
+}
+
+@article{zhou2024cilsurvey, title={Class-Incremental Learning: A Survey}, volume={46}, ISSN={1939-3539}, url={http://dx.doi.org/10.1109/TPAMI.2024.3429383}, DOI={10.1109/tpami.2024.3429383}, number={12}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, publisher={Institute of Electrical and Electronics Engineers (IEEE)}, author={Zhou, Da-Wei and Wang, Qi-Wei and Qi, Zhi-Hong and Ye, Han-Jia and Zhan, De-Chuan and Liu, Ziwei}, year={2024}, month=Dec, pages={9851--9873} }
+
+@inproceedings{wang2022sparcl,
+ author = {Wang, Zifeng and Zhan, Zheng and Gong, Yifan and Yuan, Geng and Niu, Wei and Jian, Tong and Ren, Bin and Ioannidis, Stratis and Wang, Yanzhi and Dy, Jennifer},
+ booktitle = {Advances in Neural Information Processing Systems},
+ doi = {10.52202/068431-1481},
+ editor = {S. Koyejo and S. Mohamed and A. Agarwal and D. Belgrave and K. Cho and A. Oh},
+ pages = {20366--20380},
+ publisher = {Curran Associates, Inc.},
+ title = {{SparCL}: Sparse Continual Learning on the Edge},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2022/file/80133d0f6eccaace15508f91e3c5a93c-Paper-Conference.pdf},
+ volume = {35},
+ year = {2022}
+}
+
+@InProceedings{rebuffi2017icarl,
+author = {Rebuffi, Sylvestre-Alvise and Kolesnikov, Alexander and Sperl, Georg and Lampert, Christoph H.},
+title = {{iCaRL}: Incremental Classifier and Representation Learning},
+booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+month = {July},
+year = {2017},
+pages = {5533-5542},
+doi = {10.1109/CVPR.2017.587}
+}
+
+@misc{soomro2012ucf101,
+      title={{UCF101}: A Dataset of 101 Human Actions Classes From Videos in The Wild},
+      author={Khurram Soomro and Amir Roshan Zamir and Mubarak Shah},
+      year={2012},
+      eprint={1212.0402},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/1212.0402},
+      doi={10.48550/arXiv.1212.0402}
+}
+
+@InProceedings{goyal2017ssv2,
+author = {Goyal, Raghav and Ebrahimi Kahou, Samira and Michalski, Vincent and Materzynska, Joanna and Westphal, Susanne and Kim, Heuna and Haenel, Valentin and Fruend, Ingo and Yianilos, Peter and Mueller-Freitag, Moritz and Hoppe, Florian and Thurau, Christian and Bax, Ingo and Memisevic, Roland},
+title = {The "Something Something" Video Database for Learning and Evaluating Visual Common Sense},
+booktitle = {Proceedings of the IEEE International Conference on Computer Vision (ICCV)},
+month = {Oct},
+year = {2017},
+pages = {5843-5851},
+doi = {10.1109/ICCV.2017.622}
+}
+
+@InProceedings{radford2021clip, title = {Learning Transferable Visual Models From Natural Language Supervision}, author = {Radford, Alec and Kim, Jong Wook and Hallacy, Chris and Ramesh, Aditya and Goh, Gabriel and Agarwal, Sandhini and Sastry, Girish and Askell, Amanda and Mishkin, Pamela and Clark, Jack and Krueger, Gretchen and Sutskever, Ilya}, booktitle = {Proceedings of the 38th International Conference on Machine Learning}, pages = {8748--8763}, year = {2021}, editor = {Meila, Marina and Zhang, Tong}, volume = {139}, series = {Proceedings of Machine Learning Research}, month = {18--24 Jul}, publisher = {PMLR}, pdf = {http://proceedings.mlr.press/v139/radford21a/radford21a.pdf}, url = {https://proceedings.mlr.press/v139/radford21a.html} }
+
+@misc{ilharco2021openclip,
+  author       = {Ilharco, Gabriel and
+                  Wortsman, Mitchell and
+                  Wightman, Ross and
+                  Gordon, Cade and
+                  Carlini, Nicholas and
+                  Taori, Rohan and
+                  Dave, Achal and
+                  Shankar, Vaishaal and
+                  Namkoong, Hongseok and
+                  Miller, John and
+                  Hajishirzi, Hannaneh and
+                  Farhadi, Ali and
+                  Schmidt, Ludwig},
+  title        = {{OpenCLIP}, v2.0.0 [software]},
+  howpublished = {Zenodo},
+  month        = sep,
+  year         = 2022,
+  doi          = {10.5281/zenodo.7083294},
+  url          = {https://doi.org/10.5281/zenodo.7083294}
+}
+
+@InProceedings{lin2019tsm,
+author = {Lin, Ji and Gan, Chuang and Han, Song},
+title = {{TSM}: Temporal Shift Module for Efficient Video Understanding},
+booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+month = {October},
+year = {2019},
+pages = {7082-7092},
+doi = {10.1109/ICCV.2019.00718}
+}
+
+@InProceedings{bertasius2021timesformer, title = {Is Space-Time Attention All You Need for Video Understanding?}, author = {Bertasius, Gedas and Wang, Heng and Torresani, Lorenzo}, booktitle = {Proceedings of the 38th International Conference on Machine Learning}, pages = {813--824}, year = {2021}, editor = {Meila, Marina and Zhang, Tong}, volume = {139}, series = {Proceedings of Machine Learning Research}, month = {18--24 Jul}, publisher = {PMLR}, pdf = {http://proceedings.mlr.press/v139/bertasius21a/bertasius21a.pdf}, url = {https://proceedings.mlr.press/v139/bertasius21a.html} }
+
+@inproceedings{schuhmann2022laion5b,
+ author = {Schuhmann, Christoph and Beaumont, Romain and Vencu, Richard and Gordon, Cade and Wightman, Ross and Cherti, Mehdi and Coombes, Theo and Katta, Aarush and Mullis, Clayton and Wortsman, Mitchell and Schramowski, Patrick and Kundurthy, Srivatsa and Crowson, Katherine and Schmidt, Ludwig and Kaczmarczyk, Robert and Jitsev, Jenia},
+ booktitle = {Advances in Neural Information Processing Systems},
+ doi = {10.52202/068431-1833},
+ editor = {S. Koyejo and S. Mohamed and A. Agarwal and D. Belgrave and K. Cho and A. Oh},
+ pages = {25278--25294},
+ publisher = {Curran Associates, Inc.},
+ title = {{LAION-5B}: An open large-scale dataset for training next generation image-text models},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2022/file/a1859debfb3b59d094f3504d5ebb6c25-Paper-Datasets_and_Benchmarks.pdf},
+ volume = {35},
+ year = {2022}
+}

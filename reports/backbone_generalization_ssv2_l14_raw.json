@@ -1,0 +1,124 @@
+{
+  "_meta": {
+    "generated_utc": "2026-09-06T06:32:00+00:00",
+    "git_commit": "60983bb237495b181bc2177f7380ebabc279f11e",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "eports/RESEARCH_LOG.md",
+      "reports/sota_positioning_brief.md",
+      "dev/run_backbone_generalization_ssv2.py",
+      "dev/run_diff_ablation.py",
+      "dev/run_hdc_comparison.py",
+      "dev/run_overlap_pooling.py",
+      "dev/run_ssv2_tcd_174_pooling.py",
+      "reports/assets_diff_diagram.png",
+      "reports/assets_diff_diagram_frame.png",
+      "reports/assets_diff_diagram_segment.png",
+      "reports/assets_pooling_diagram.png",
+      "reports/assets_segment_count_inverted_u.png",
+      "reports/diff_ablation_raw.json",
+      "reports/experimental_setup_section.md",
+      "reports/hdc_comparison_raw.json",
+      "reports/hdc_comparison_result.md",
+      "reports/overlap_pooling_raw.json",
+      "reports/overlap_pooling_result.md",
+      "reports/paper_draft.tex",
+      "reports/paper_draft_ko.aux"
+    ],
+    "script": "dev/run_backbone_generalization_ssv2.py",
+    "argv": [],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "backbone": "openclip_l14",
+  "dim_native": 768,
+  "results": {
+    "mean": {
+      "per_step": [
+        0.5133333333333333,
+        0.3433333333333333,
+        0.2791907514450867,
+        0.21587982832618025,
+        0.2114071038251366,
+        0.20294784580498867,
+        0.18503169185763044,
+        0.17779668226286688
+      ],
+      "avg_inc": 0.26611507127356954,
+      "last": 0.17779668226286688,
+      "fit_s": 0.6461559580056928,
+      "dim": 768
+    },
+    "chunks3": {
+      "per_step": [
+        0.6366666666666667,
+        0.4508333333333333,
+        0.41040462427745666,
+        0.3373390557939914,
+        0.3302595628415301,
+        0.30753968253968256,
+        0.2835202340321794,
+        0.264568268821778
+      ],
+      "avg_inc": 0.3776414285383273,
+      "last": 0.264568268821778,
+      "fit_s": 4.305869750009151,
+      "dim": 2304
+    },
+    "chunks4": {
+      "per_step": [
+        0.64,
+        0.4525,
+        0.4277456647398844,
+        0.3424892703862661,
+        0.3353825136612022,
+        0.31037414965986393,
+        0.2862018527547538,
+        0.26775840068056145
+      ],
+      "avg_inc": 0.3828064814853165,
+      "last": 0.26775840068056145,
+      "fit_s": 8.469397500011837,
+      "dim": 3072
+    },
+    "chunks3+adjdiff": {
+      "per_step": [
+        0.64,
+        0.44583333333333336,
+        0.41965317919075146,
+        0.3424892703862661,
+        0.34255464480874315,
+        0.31746031746031744,
+        0.29424670892247684,
+        0.2752020416843896
+      ],
+      "avg_inc": 0.38467993697328473,
+      "last": 0.2752020416843896,
+      "fit_s": 12.542738582997117,
+      "dim": 3840
+    },
+    "chunks4+adjdiff": {
+      "per_step": [
+        0.6266666666666667,
+        0.43916666666666665,
+        0.4144508670520231,
+        0.3373390557939914,
+        0.32889344262295084,
+        0.3066893424036281,
+        0.28278888347147735,
+        0.2647809442790302
+      ],
+      "avg_inc": 0.37509698361955435,
+      "last": 0.2647809442790302,
+      "fit_s": 27.979866875015432,
+      "dim": 5376
+    }
+  }
+}

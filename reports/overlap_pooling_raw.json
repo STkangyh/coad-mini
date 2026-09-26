@@ -1,0 +1,223 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-21T01:39:08+00:00",
+    "git_commit": "60983bb237495b181bc2177f7380ebabc279f11e",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "eports/RESEARCH_LOG.md",
+      "dev/run_hdc_comparison.py",
+      "dev/run_overlap_pooling.py",
+      "reports/experimental_setup_section.md",
+      "reports/hdc_comparison_raw.json",
+      "reports/hdc_comparison_result.md",
+      "reports/overlap_pooling_raw.json",
+      "reports/paper_outline_draft.md",
+      "reports/recent_cpu_only_cl_survey_2026_result.md"
+    ],
+    "script": "dev/run_overlap_pooling.py",
+    "argv": [],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "select_frac": 0.25,
+  "selected_on_train": "chunks4",
+  "best_overlap_variant": "chunks4_ov0.25",
+  "zero_overlap_anchor": "chunks4_ov0.0",
+  "selection": {
+    "mean": {
+      "avg_inc_mean": 0.3502384920634921,
+      "avg_inc_sd": 0.030070581790507103,
+      "last_mean": 0.225,
+      "last_sd": 0.0,
+      "dim": 512
+    },
+    "chunks3": {
+      "avg_inc_mean": 0.43918928571428567,
+      "avg_inc_sd": 0.03234291886437701,
+      "last_mean": 0.3333333333333333,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks4": {
+      "avg_inc_mean": 0.44865496031746027,
+      "avg_inc_sd": 0.03396785043591898,
+      "last_mean": 0.35083333333333333,
+      "last_sd": 0.0,
+      "dim": 2048
+    },
+    "chunks3_ov0.0": {
+      "avg_inc_mean": 0.4412559523809524,
+      "avg_inc_sd": 0.032854505605715546,
+      "last_mean": 0.33166666666666667,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks3_ov0.25": {
+      "avg_inc_mean": 0.4409305555555555,
+      "avg_inc_sd": 0.031577410717388454,
+      "last_mean": 0.335,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks3_ov0.5": {
+      "avg_inc_mean": 0.4341305555555556,
+      "avg_inc_sd": 0.03292037642226615,
+      "last_mean": 0.3283333333333333,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks3_ov1.0": {
+      "avg_inc_mean": 0.4256748015873016,
+      "avg_inc_sd": 0.031380338814796016,
+      "last_mean": 0.31583333333333335,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks3_ov2.0": {
+      "avg_inc_mean": 0.4012271825396825,
+      "avg_inc_sd": 0.03061269108641718,
+      "last_mean": 0.2941666666666667,
+      "last_sd": 0.0,
+      "dim": 1536
+    },
+    "chunks4_ov0.0": {
+      "avg_inc_mean": 0.44865496031746027,
+      "avg_inc_sd": 0.03396785043591898,
+      "last_mean": 0.35083333333333333,
+      "last_sd": 0.0,
+      "dim": 2048
+    },
+    "chunks4_ov0.25": {
+      "avg_inc_mean": 0.44865496031746027,
+      "avg_inc_sd": 0.03396785043591898,
+      "last_mean": 0.35083333333333333,
+      "last_sd": 0.0,
+      "dim": 2048
+    },
+    "chunks4_ov0.5": {
+      "avg_inc_mean": 0.4469039682539683,
+      "avg_inc_sd": 0.03475941963330072,
+      "last_mean": 0.34,
+      "last_sd": 0.0,
+      "dim": 2048
+    },
+    "chunks4_ov1.0": {
+      "avg_inc_mean": 0.43454305555555556,
+      "avg_inc_sd": 0.031796296064492906,
+      "last_mean": 0.3275,
+      "last_sd": 0.0,
+      "dim": 2048
+    },
+    "chunks4_ov2.0": {
+      "avg_inc_mean": 0.4207373015873016,
+      "avg_inc_sd": 0.0306810589484237,
+      "last_mean": 0.31833333333333336,
+      "last_sd": 0.0,
+      "dim": 2048
+    }
+  },
+  "report": {
+    "uniform-8x6/mean": {
+      "avg_inc_mean": 0.27201700891370395,
+      "avg_inc_sd": 0.021616766638995706,
+      "last_mean": 0.15737983836665248,
+      "last_sd": 0.0
+    },
+    "uniform-8x6/chunks4": {
+      "avg_inc_mean": 0.34116314926176433,
+      "avg_inc_sd": 0.023647461598758805,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "uniform-8x6/chunks4_ov0.25": {
+      "avg_inc_mean": 0.34116314926176433,
+      "avg_inc_sd": 0.023647461598758805,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "uniform-8x6/chunks4_ov0.0": {
+      "avg_inc_mean": 0.34116314926176433,
+      "avg_inc_sd": 0.023647461598758805,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "uniform-8x6/delta_vs_mean": {
+      "avg_inc_pp": 6.914614034806038,
+      "last_pp": 7.826456826882181,
+      "avg_inc_effect_size_sd": 3.052152336120071
+    },
+    "uniform-8x6/delta_overlap_vs_mean": {
+      "avg_inc_pp": 6.914614034806038,
+      "last_pp": 7.826456826882181,
+      "avg_inc_effect_size_sd": 3.052152336120071
+    },
+    "uniform-8x6/delta_overlap_vs_anchor": {
+      "avg_inc_pp": 0.0,
+      "last_pp": 0.0,
+      "avg_inc_effect_size_sd": 0.0
+    },
+    "uniform-8x6/delta_overlap_vs_original_impl": {
+      "avg_inc_pp": 0.0,
+      "last_pp": 0.0,
+      "avg_inc_effect_size_sd": 0.0
+    },
+    "base-heavy-24+4x6/mean": {
+      "avg_inc_mean": 0.20068104670718223,
+      "avg_inc_sd": 0.009744507229885718,
+      "last_mean": 0.15737983836665248,
+      "last_sd": 0.0
+    },
+    "base-heavy-24+4x6/chunks4": {
+      "avg_inc_mean": 0.27728197468057864,
+      "avg_inc_sd": 0.007762133967148502,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "base-heavy-24+4x6/chunks4_ov0.25": {
+      "avg_inc_mean": 0.27728197468057864,
+      "avg_inc_sd": 0.007762133967148502,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "base-heavy-24+4x6/chunks4_ov0.0": {
+      "avg_inc_mean": 0.27728197468057864,
+      "avg_inc_sd": 0.007762133967148502,
+      "last_mean": 0.23564440663547429,
+      "last_sd": 3.1031676915590914e-17
+    },
+    "base-heavy-24+4x6/delta_vs_mean": {
+      "avg_inc_pp": 7.66009279733964,
+      "last_pp": 7.826456826882181,
+      "avg_inc_effect_size_sd": 8.695500268684635
+    },
+    "base-heavy-24+4x6/delta_overlap_vs_mean": {
+      "avg_inc_pp": 7.66009279733964,
+      "last_pp": 7.826456826882181,
+      "avg_inc_effect_size_sd": 8.695500268684635
+    },
+    "base-heavy-24+4x6/delta_overlap_vs_anchor": {
+      "avg_inc_pp": 0.0,
+      "last_pp": 0.0,
+      "avg_inc_effect_size_sd": 0.0
+    },
+    "base-heavy-24+4x6/delta_overlap_vs_original_impl": {
+      "avg_inc_pp": 0.0,
+      "last_pp": 0.0,
+      "avg_inc_effect_size_sd": 0.0
+    }
+  }
+}

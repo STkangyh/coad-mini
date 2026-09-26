@@ -964,4 +964,54 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
-| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) · [ssv2_accuracy_interpretation_result.md](ssv2_accuracy_interpretation_result.md) · [essential_trained_module_edge_feasibility_result.md](essential_trained_module_edge_feasibility_result.md) |
+| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) · [ssv2_accuracy_interpretation_result.md](ssv2_accuracy_interpretation_result.md) · [essential_trained_module_edge_feasibility_result.md](essential_trained_module_edge_feasibility_result.md) · [recent_cpu_only_cl_survey_2026_result.md](recent_cpu_only_cl_survey_2026_result.md) · [hdc_comparison_result.md](hdc_comparison_result.md) |
+| 08-20 | [experimental_setup_section.md](experimental_setup_section.md)(논문 §4.1용 데이터·하이퍼파라미터·지표 정의) |
+| 08-21 | [paper_outline_draft.md](paper_outline_draft.md)(Notion 개요 빈 칸을 기존 리포트 근거로 채운 초안) · [overlap_pooling_result.md](overlap_pooling_result.md)(구간 overlap 시도 — 음성 결과, 채택 안 함) |
+| 08-23 | [sota_positioning_brief.md](sota_positioning_brief.md)(TCD 계열 표에 CIVC 추가) · `paper_outline_draft.md` 대폭 갱신(CIVC·CSTA 원문 재확인, diff ablation §3.4 신설, Method를 3.1 Problem Formulation/3.2 FeCAM/3.3 Order-Preserving Pooling/3.4 Adjacent Diff로 재구조화, space complexity 재표현) |
+
+---
+
+## 2026-08-23 · Diff ablation — 구간 수(k)에 따라 diff 기여가 갈린다
+
+**질문:** chunks3+adjdiff(24.71)와 chunks4(23.56)는 이미 알려진 값이지만, 그 안에서
+"diff를 뺐을 때"와 "더했을 때"만 따로 갈라본 적은 없었다 — 지금까지는 구간 수와 diff
+유무가 동시에 바뀌는 비교였다. `dev/run_diff_ablation.py`(신규)로 k=3·k=4 각각에서
+diff 유무만 바꿔 4개 변형을 동일 프로토콜로 실행했다
+([`reports/diff_ablation_raw.json`](diff_ablation_raw.json)).
+
+- **k=3: diff가 8/8 스테이지 전부에서 이긴다** — chunks3 24.05 → chunks3+adjdiff
+  **24.71**(+0.66pp last, +1.45pp avg_inc).
+- **k=4: diff 효과가 애매하다** — chunks4 23.56 → chunks4+adjdiff 23.97(+0.41pp last)인데
+  avg_inc는 오히려 **−0.44pp**(8스테이지 중 6개에서 손해).
+- 기존 두 값(24.71/23.56)을 정확히 재현하는지 스크립트가 자동 검증하게 만들었고
+  둘 다 통과 — 새 두 값(chunks3=24.05, chunks4+adjdiff=23.97)만 이번에 처음 쟀다.
+- 해석: 구간을 이미 4개로 쪼개면 diff가 채울 시간 정보가 줄어든다 — **구간 세분화와
+  diff는 부분적으로 중복된 레버**다. `chunks4+adjdiff`는 네 조합 중 가장 비싸면서
+  (dim 3584, fit 10.4초) 가장 불확실해 배포 후보에서 제외할 근거로 쓸 수 있다.
+- `paper_outline_draft.md`에 §3.4(신설)로 반영 — diff 관련 내용을 segment pooling
+  절(§3.3)에서 독립시켰다.
+
+## 2026-08-23 · CIVC 발굴 + CSTA exemplar 재확인 — SSv2 계보에 다섯 번째 참고문헌
+
+**질문:** "sequence(시간 순서)를 중요하게 다루는 video CIL을 더 찾아보자"는 요청으로
+문헌 서치 → 상위 후보를 원문(PDF) 직접 확인.
+
+- **CIVC**("When Video Classification Meets Incremental Classes", ACM MM 2021,
+  [arXiv:2106.15827](https://arxiv.org/abs/2106.15827))가 가장 강한 매치였다 — 지식증류
+  전에 spatio-temporal feature를 **motion trajectory 기반으로 분해**하고 나서 증류하면
+  fused-baseline 40.79 → decomposed 45.87 → **decomposed+trajectory 46.30**(자체
+  40클래스 SSv2 subset, TCD와는 다른 split). 결정적으로 SSv2를 설명하며 "왼쪽→오른쪽
+  밀기 vs 오른쪽→왼쪽" 예시를 우리와 **독립적으로 동일하게** 든다. `sota_positioning_brief.md
+  §1(f)`의 TCD 계열 표에 5번째 행(‡ 각주로 프로토콜 차이 명시)으로, `paper_outline_draft.md`
+  §2.1(b)/(c)에도 반영.
+- **SMILE**("Just a Glimpse", CVPR'23 워크숍 Best Paper, [arXiv:2305.18418](https://arxiv.org/abs/2305.18418))는
+  반례로 확인만 해둠 — 극단적 메모리 제약에서는 리플레이 메모리의 **비디오 다양성이
+  시간 정보보다 중요**하다는 주장. exemplar 큐레이션 문제라 우리(pooling)와는 파이프라인의
+  다른 지점 — 직접 충돌은 아니라 채택 안 하고 참고로만 남김.
+- **CSTA exemplar 사용 여부, 원문 §IV-A로 확정**: "exemplar-free"를 표방하지만 실제로는
+  태스크마다 fine-tuning 단계에서 클래스당 실제 샘플 5개(TCD와 동일 정의)를 쓰고,
+  이게 Table I 헤드라인 수치에 기본 포함된다(원문이 스스로 "CSTA(FT)"로 표기).
+  기존 "인용 시 뉘앙스 확인 필요" 각주를 원문 인용으로 확정했다.
+- CIVC 원문 전체를 재검색해도 wall-clock·FPS·latency 언급이 없음도 확인 —
+  TCD/STSP/CSTA/ESSENTIAL과 같은 "시간을 안 잰다" 패턴이 다섯 번째 사례에서도 유지됨
+  (`paper_outline_draft.md` §2.1(e)).

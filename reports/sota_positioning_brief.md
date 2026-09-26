@@ -35,18 +35,31 @@
 
 **(f) TCD 계열 — SSv2 자체를 CIL 벤치마크로 쓴 연구 (우리 데이터셋 선택과 가장 직접 겹침)**
 
-**"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열이고, 세 논문 원문을
-전부 직접 읽어 검증함**(검색 스니펫이 아니라 PDF 원문 확인, 아래 표는 전부 원문 출처):
+**"SSv2로 CIL 하는 게 새롭다"는 주장은 틀림 — 이미 확립된 계열이고, 원문을
+전부 직접 읽어 검증함**(검색 스니펫이 아니라 PDF 원문 확인, 아래 표는 전부 원문 출처).
+TCD·STSP·CSTA·ESSENTIAL 네 편은 완전히 동일한 split(174클래스, 84 base+[10×9]/[5×18])을
+쓰고, **CIVC(2021)는 이보다 앞서지만 별도의 40클래스 소규모 split**을 써서 직접 비교는
+안 되지만, "SSv2는 방향성이 본질"이라는 문제의식을 우리와 독립적으로 공유해 참고로
+추가한다(§4 우리 §3.2(a)와 동일한 좌/우 방향 예시를 원문에서 그대로 씀):
 
-| 논문 | 발표 | split (SSv2, 174cls) | exemplar | 백본 | SSv2 정확도(10×9/5×18) |
+| 논문 | 발표 | split (SSv2) | exemplar | 백본 | SSv2 정확도 |
 |---|---|---|---|---|---|
-| **TCD** ([arXiv:2203.13611](https://arxiv.org/abs/2203.13611), [GitHub](https://github.com/bellos1203/TCD)) | ICCV 2021 | 84 base + [10×9]/[5×18] | 20/class | ResNet-50+TSM, ImageNet-init, CIL 내내 fine-tune | CNN **35.78/29.60** |
-| **STSP** ([PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) | ECCV 2024 | 동일 split | **0**(exemplar-free) | ResNet-50+TSM, gradient를 옛 특징 null space로 투영(SGP) | **69.68/70.87**(이 계열 최고) |
-| **CSTA** ([arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) | TCSVT 투고중(2025) | 동일 split | 0(표현)/5개(fine-tune 보정)† | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26/— (TCD 벤치 2위) |
-| **ESSENTIAL** ([arXiv:2508.10896](https://arxiv.org/abs/2508.10896), [GitHub](https://github.com/KHU-VLL/ESSENTIAL)) | ICCV 2025 Highlight | 동일 split | sparse(1~2프레임)+학습형 prompt | **frozen CLIP** + 학습형 temporal encoder + cross-attention 복원(MR 모듈) | 48.9/47.5 (메모리 8.4~8.6MiB — STSP의 1/68) |
+| **TCD** ([arXiv:2203.13611](https://arxiv.org/abs/2203.13611), [GitHub](https://github.com/bellos1203/TCD)) | ICCV 2021 | 174cls, 84 base + [10×9]/[5×18] | 20/class | ResNet-50+TSM, ImageNet-init, CIL 내내 fine-tune | CNN **35.78/29.60** |
+| **STSP** ([PDF](https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/04106.pdf)) | ECCV 2024 | 동일 split(TCD 기준) | **0**(exemplar-free) | ResNet-50+TSM, gradient를 옛 특징 null space로 투영(SGP) | **69.68/70.87**(이 계열 최고) |
+| **CSTA** ([arXiv:2501.07236](https://arxiv.org/abs/2501.07236)) | TCSVT 투고중(2025) | 동일 split(TCD 기준) | 0(표현)/5개(fine-tune 보정)† | TimeSformer + 공간·시간 분리 어댑터 + causal loss | 41.26/— (TCD 벤치 2위) |
+| **ESSENTIAL** ([arXiv:2508.10896](https://arxiv.org/abs/2508.10896), [GitHub](https://github.com/KHU-VLL/ESSENTIAL)) | ICCV 2025 Highlight | 동일 split(TCD 기준) | sparse(1~2프레임)+학습형 prompt | **frozen CLIP** + 학습형 temporal encoder + cross-attention 복원(MR 모듈) | 48.9/47.5 (메모리 8.4~8.6MiB — STSP의 1/68) |
+| **CIVC** ([arXiv:2106.15827](https://arxiv.org/abs/2106.15827)) | ACM MM 2021 | **40cls 소규모 subset**, i-Sth-Sth-B0/B20‡ | 5/class(video)+key-frame(dual-granularity) | TSM-ResNet50, **motion trajectory 기반 spatio-temporal 분해 후 증류** | 46.30(B0)‡ |
 
 † CSTA는 "exemplar-free"를 표방하지만 fine-tuning 단계에서 이전 태스크 클래스당
 5개 샘플로 balanced set을 구성한다고 원문에 명시 — 인용 시 이 뉘앙스 확인 필요.
+‡ CIVC는 TCD와 다른 SSv2 분할(40클래스 부분집합, 20 base+20 incremental/5세션)을
+쓰므로 위 네 행의 10×9/5×18 수치와 직접 비교 불가 — 값 자체보다 **자체 ablation**이
+의미 있다: fused(합쳐서 증류, baseline) 40.79 → decomposed(분해만) 45.87 → **decomposed
++trajectory 46.30**. "시간 정보를 합치지 말고 분해해서 다뤄야 한다"는 논지를 지식증류
+단계에서 실측한 것으로, 우리가 pooling 단계에서 실측한 것(§3.2)과 같은 결론을 다른
+파이프라인 지점에서 독립적으로 뒷받침한다. 원문 인용도 우리 예시와 겹친다: *"Something-
+Something V2 dataset incorporates concepts of left and right, e.g., pulling something
+from left to right and pulling..."*
 
 **ESSENTIAL이 이 계열에서 우리와 구조적으로 가장 가까움 — 유일하게 frozen 비주얼
 백본을 쓴다.** ESSENTIAL의 visual encoder는 CLIP이고 **한 번도 SSv2로 학습되지
