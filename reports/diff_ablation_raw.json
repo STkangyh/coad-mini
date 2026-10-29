@@ -1,0 +1,95 @@
+{
+  "_meta": {
+    "generated_utc": "2026-08-21T05:15:30+00:00",
+    "git_commit": "60983bb237495b181bc2177f7380ebabc279f11e",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "eports/RESEARCH_LOG.md",
+      "dev/run_diff_ablation.py",
+      "dev/run_hdc_comparison.py",
+      "dev/run_overlap_pooling.py",
+      "reports/experimental_setup_section.md",
+      "reports/hdc_comparison_raw.json",
+      "reports/hdc_comparison_result.md",
+      "reports/overlap_pooling_raw.json",
+      "reports/overlap_pooling_result.md",
+      "reports/paper_outline_draft.md",
+      "reports/recent_cpu_only_cl_survey_2026_result.md"
+    ],
+    "script": "dev/run_diff_ablation.py",
+    "argv": [],
+    "env": {
+      "python": "3.13.9",
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "numpy": "2.3.5",
+      "torch": "2.11.0",
+      "sklearn": "1.7.2",
+      "transformers": "5.9.0"
+    }
+  },
+  "chunks3": {
+    "per_step": [
+      0.5733333333333334,
+      0.41,
+      0.36820809248554914,
+      0.29484978540772533,
+      0.29439890710382516,
+      0.2791950113378685,
+      0.2530472940029254,
+      0.24053594215227564
+    ],
+    "avg_inc": 0.3391960457279378,
+    "last": 0.24053594215227564,
+    "fit_s": 1.9460076671093702,
+    "dim": 1536
+  },
+  "chunks3+adjdiff": {
+    "per_step": [
+      0.6083333333333333,
+      0.4325,
+      0.38439306358381503,
+      0.30257510729613735,
+      0.30020491803278687,
+      0.29223356009070295,
+      0.2623110677718186,
+      0.24712888132709485
+    ],
+    "avg_inc": 0.35370999142946113,
+    "last": 0.24712888132709485,
+    "fit_s": 4.899548917077482,
+    "dim": 2560
+  },
+  "chunks4": {
+    "per_step": [
+      0.5966666666666667,
+      0.4191666666666667,
+      0.3606936416184971,
+      0.2927038626609442,
+      0.2926912568306011,
+      0.27494331065759636,
+      0.25134080936128717,
+      0.23564440663547426
+    ],
+    "avg_inc": 0.3404813276372167,
+    "last": 0.23564440663547426,
+    "fit_s": 3.33931858278811,
+    "dim": 2048
+  },
+  "chunks4+adjdiff": {
+    "per_step": [
+      0.585,
+      0.4008333333333333,
+      0.35895953757225435,
+      0.28583690987124466,
+      0.29098360655737704,
+      0.2766439909297052,
+      0.2508532423208191,
+      0.23968524032326669
+    ],
+    "avg_inc": 0.3360994826135001,
+    "last": 0.23968524032326669,
+    "fit_s": 10.380432459060103,
+    "dim": 3584
+  }
+}

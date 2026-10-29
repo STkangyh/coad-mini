@@ -490,23 +490,37 @@ Qualcomm 공식 배포처에서 19.4GB 직접 다운로드(220,847개 webm 전�
 
 ---
 
-## 2026-08-06 · AP-FPS 24조합 스윕 — 배포 조합이 Pareto인가
+## 2026-08-06 · AP-FPS 스윕 — 배포 조합이 Pareto인가 (08-08 세 차례 정정)
 
 📄 [`ap_fps_sweep_result.md`](ap_fps_sweep_result.md)
 
-backbone(clip_b32/openclip_l14) × pooling(mean/chunks4/chunks3_adjdiff) × head(NCM/SLDA/
-Ridge-RLS/FeCAM) 24조합을 mAP·FPS 평면에 처음으로 동시에 올림 — 이전엔 축마다 따로
-최적화해왔음(pooling은 정확도로, head는 pooling 고정 후, 속도는 배포 조합 하나만).
+pooling(mean/chunks4/chunks3_adjdiff) × head(NCM/SLDA/FeCAM) 9조합(clip_b32)을 mAP·FPS
+평면에 처음으로 동시에 올림 — 이전엔 축마다 따로 최적화해왔음(pooling은 정확도로, head는
+pooling 고정 후, 속도는 배포 조합 하나만).
 
 - **측정 아티팩트 발견·수정:** FeCAM 원시 점수(음의 마할라노비스 거리)는 샘플별 오프셋
   편차가 ~1176인데 행 내부 편차는 4~14뿐 — macro AP가 이 오프셋에 오염돼 FeCAM을
-  최하위(0.028)로 잘못 보고했다(정확도는 최고인데). 행 z-score 정규화로 수정 후
-  0.028→0.215(7.7배), **모든 head·pooling 조합에서 FeCAM이 1위**로 뒤집힘.
-- **FPS는 backbone이 99% 결정** — pooling·head를 아무리 바꿔도 안 움직임(D=3840까지도).
-- **10fps 예산이 openclip_l14를 전부 탈락시킴**(4.8fps) — 예산 안에서 최선은 여전히
-  clip_b32+FeCAM, **현재 배포 조합이 정당화됨**.
+  최하위로 잘못 보고했다(정확도는 최고인데). 행 z-score 정규화로 수정 후 **모든
+  head·pooling 조합에서 FeCAM이 1위**로 뒤집힘.
+- **FPS는 인코더가 95%+ 결정** — pooling·head를 아무리 바꿔도 39.4~41.6fps 범위 안,
+  전부 10fps 예산의 4배 가까운 여유. 이 스코프에선 fps가 결정을 제약하지 않는다.
 - chunks3+adjdiff가 val에서 근소 우위를 보이지만 **배포 변경 근거 아님**(단일 실행,
   held-out 프로토콜에서는 원래 통계적 동률).
+- **08-08 정정 ①:** head를 처음엔 4개(NCM/SLDA/Ridge-RLS/FeCAM)로 돌렸는데, 사용자 확인
+  없이 Ridge-RLS를 넣은 것이었다 — `cpu_friendly_methods_result.md`의 1세대 비교가
+  NCM/SLDA/Ridge였다가 FeCAM 도입 후 `ssv2_head_curves_result.md`(08-08에 뒤늦게 작성 —
+  전엔 스크립트·raw json만 있고 마크다운 리포트가 없었음)·`pycil_bridge_result.md`가
+  이미 Ridge를 빼고 NCM/SLDA/FeCAM 3개로 정착시킨 이력이 있었는데, 그걸 확인 안 하고
+  이미 은퇴한 head를 되살린 셈. Ridge 제외하고 재실행.
+- **08-08 정정 ②:** backbone도 원래 clip_b32/openclip_l14 2개(24→18조합)로 비교했는데,
+  L/14는 8배 느려(196ms vs 24ms) 10fps 예산 자체를 못 지켜 이 리포트의 질문("배포
+  조합이 Pareto인가")과 무관한 잡음이었다 — clip_b32 단독(9조합)으로 스코프를 좁힘.
+- **08-08 정정 ③:** "왜 top-1 대신 mAP를 주 지표로 썼냐"는 질문에 확인해보니 **근거가
+  없었다** — mAP 자체는 `dev/compute_val_metrics.py`가 이미 쓰던 지표라 없던 걸 새로
+  끌어온 건 아니지만, 이 프로젝트의 다른 모든 리포트는 정확도를 헤드라인으로 쓰는데
+  이 리포트만 mAP를 메인 축으로 쓴 데엔 기록된 이유가 없었다. 본문을 정확도 기준으로
+  재구성하고 mAP는 §6(측정 아티팩트 발견 경위)에 부차 지표로 내림. 세 정정 내내 결론
+  (FeCAM 전승, fps는 인코더가 지배, chunks4 유지가 맞음)은 그대로 유지됨.
 
 ## 2026-08-08 · CIFAR-100 PTM 문헌 대조 — PyCIL 실제 모델과의 비교는 SSv2가 아닌 여기서
 
@@ -559,6 +573,33 @@ encoder+cross-attention이 backprop으로 실제 상당한 정보를 더 뽑아�
 전혀 다른 축임을 이 결과가 보여준다. 한계: 84/90 무작위 분할, ESSENTIAL의 정확한
 CLIP variant·프레임 수 미확인, ESSENTIAL은 sparse exemplar를 쓰는 반면 우리는 완전
 0-메모리.
+
+## 2026-08-08 · Ablation — FeCAM이 SLDA를 이기는 진짜 이유는 정규화가 아니었다
+
+📄 [`fecam_vs_slda_covariance_result.md §4`](fecam_vs_slda_covariance_result.md)
+
+`fecam_vs_slda_covariance_result.md`의 첫 버전은 "SLDA와 FeCAM의 차이는 공분산 정규화
+방식"이라고 결론 냈는데, 사용자가 "ablation 돌려서 기여도 분리해봐"라고 요청해서 실측—
+**결론이 정반대로 나왔다.**
+
+SLDA→FeCAM 5단계 사다리(한 번에 한 요인만 변경, 실제 `FeCAMHead`에 `_cov_terms()`만
+바꿔치기해 다른 코드는 100% 동일하게 유지 — 손으로 재구현했다가 원인 불명 오차 0.2~0.35pp가
+나서 이 방식으로 다시 짬):
+
+| 단계 | last acc | 기여 |
+|---|---|---|
+| SLDA | 14.14 | — |
+| **+Tukey 변환+L2 정규화** | 15.57 | **+1.42pp (89%)** |
+| +대각 shrink 강화(데이터 기반) | 15.74 | +0.17pp (11%) |
+| +비대각 shrink | 15.74 | +0.00pp |
+| +상관계수 정규화(=FeCAM) | 15.74 | +0.00pp |
+
+**FeCAM−SLDA 격차의 89%가 "정규화"가 아니라 "특징 전처리"(Tukey+L2, 첫 버전이 완전히
+빠뜨렸던 단계)에서 나왔다.** 상관계수 정규화는 대수적으로 **정확히 0**임을 증명함 —
+`Σ_corr=D⁻¹ΣD⁻¹`의 역행렬과 `scores()`의 `x/D`·`μ/D` 스케일링이 정확히 상쇄돼, 공유
+공분산 하나만 쓰는 세팅에서는 원문의 이 단계가 수학적 no-op이 됨(원문의 진짜 동기는
+여러 클래스별 공분산을 서로 비교 가능하게 만드는 것 — 행렬이 하나뿐이면 적용 대상이
+없음). 리포트 전체를 이 결과로 재작성함.
 
 ---
 
@@ -923,3 +964,77 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-04 | [live_query_sim_result.md](live_query_sim_result.md) |
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
+| 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) · [ssv2_accuracy_interpretation_result.md](ssv2_accuracy_interpretation_result.md) · [essential_trained_module_edge_feasibility_result.md](essential_trained_module_edge_feasibility_result.md) · [recent_cpu_only_cl_survey_2026_result.md](recent_cpu_only_cl_survey_2026_result.md) · [hdc_comparison_result.md](hdc_comparison_result.md) |
+| 08-20 | `experimental_setup_section.md`(원고 작업 파일, 저장소 미포함 · 논문 §4.1용 데이터·하이퍼파라미터·지표 정의) |
+| 08-21 | `paper_outline_draft.md`(원고 작업 파일, 저장소 미포함 · Notion 개요 빈 칸을 기존 리포트 근거로 채운 초안) · [overlap_pooling_result.md](overlap_pooling_result.md)(구간 overlap 시도 — 음성 결과, 채택 안 함) |
+| 08-23 | [sota_positioning_brief.md](sota_positioning_brief.md)(TCD 계열 표에 CIVC 추가) · `paper_outline_draft.md` 대폭 갱신(CIVC·CSTA 원문 재확인, diff ablation §3.4 신설, Method를 3.1 Problem Formulation/3.2 FeCAM/3.3 Order-Preserving Pooling/3.4 Adjacent Diff로 재구조화, space complexity 재표현) |
+
+---
+
+## 2026-08-23 · Diff ablation — 구간 수(k)에 따라 diff 기여가 갈린다
+
+**질문:** chunks3+adjdiff(24.71)와 chunks4(23.56)는 이미 알려진 값이지만, 그 안에서
+"diff를 뺐을 때"와 "더했을 때"만 따로 갈라본 적은 없었다 — 지금까지는 구간 수와 diff
+유무가 동시에 바뀌는 비교였다. `dev/run_diff_ablation.py`(신규)로 k=3·k=4 각각에서
+diff 유무만 바꿔 4개 변형을 동일 프로토콜로 실행했다
+([`reports/diff_ablation_raw.json`](diff_ablation_raw.json)).
+
+- **k=3: diff가 8/8 스테이지 전부에서 이긴다** — chunks3 24.05 → chunks3+adjdiff
+  **24.71**(+0.66pp last, +1.45pp avg_inc).
+- **k=4: diff 효과가 애매하다** — chunks4 23.56 → chunks4+adjdiff 23.97(+0.41pp last)인데
+  avg_inc는 오히려 **−0.44pp**(8스테이지 중 6개에서 손해).
+- 기존 두 값(24.71/23.56)을 정확히 재현하는지 스크립트가 자동 검증하게 만들었고
+  둘 다 통과 — 새 두 값(chunks3=24.05, chunks4+adjdiff=23.97)만 이번에 처음 쟀다.
+- 해석: 구간을 이미 4개로 쪼개면 diff가 채울 시간 정보가 줄어든다 — **구간 세분화와
+  diff는 부분적으로 중복된 레버**다. `chunks4+adjdiff`는 네 조합 중 가장 비싸면서
+  (dim 3584, fit 10.4초) 가장 불확실해 배포 후보에서 제외할 근거로 쓸 수 있다.
+- `paper_outline_draft.md`에 §3.4(신설)로 반영 — diff 관련 내용을 segment pooling
+  절(§3.3)에서 독립시켰다.
+
+## 2026-08-23 · CIVC 발굴 + CSTA exemplar 재확인 — SSv2 계보에 다섯 번째 참고문헌
+
+**질문:** "sequence(시간 순서)를 중요하게 다루는 video CIL을 더 찾아보자"는 요청으로
+문헌 서치 → 상위 후보를 원문(PDF) 직접 확인.
+
+- **CIVC**("When Video Classification Meets Incremental Classes", ACM MM 2021,
+  [arXiv:2106.15827](https://arxiv.org/abs/2106.15827))가 가장 강한 매치였다 — 지식증류
+  전에 spatio-temporal feature를 **motion trajectory 기반으로 분해**하고 나서 증류하면
+  fused-baseline 40.79 → decomposed 45.87 → **decomposed+trajectory 46.30**(자체
+  40클래스 SSv2 subset, TCD와는 다른 split). 결정적으로 SSv2를 설명하며 "왼쪽→오른쪽
+  밀기 vs 오른쪽→왼쪽" 예시를 우리와 **독립적으로 동일하게** 든다. `sota_positioning_brief.md
+  §1(f)`의 TCD 계열 표에 5번째 행(‡ 각주로 프로토콜 차이 명시)으로, `paper_outline_draft.md`
+  §2.1(b)/(c)에도 반영.
+- **SMILE**("Just a Glimpse", CVPR'23 워크숍 Best Paper, [arXiv:2305.18418](https://arxiv.org/abs/2305.18418))는
+  반례로 확인만 해둠 — 극단적 메모리 제약에서는 리플레이 메모리의 **비디오 다양성이
+  시간 정보보다 중요**하다는 주장. exemplar 큐레이션 문제라 우리(pooling)와는 파이프라인의
+  다른 지점 — 직접 충돌은 아니라 채택 안 하고 참고로만 남김.
+- **CSTA exemplar 사용 여부, 원문 §IV-A로 확정**: "exemplar-free"를 표방하지만 실제로는
+  태스크마다 fine-tuning 단계에서 클래스당 실제 샘플 5개(TCD와 동일 정의)를 쓰고,
+  이게 Table I 헤드라인 수치에 기본 포함된다(원문이 스스로 "CSTA(FT)"로 표기).
+  기존 "인용 시 뉘앙스 확인 필요" 각주를 원문 인용으로 확정했다.
+- CIVC 원문 전체를 재검색해도 wall-clock·FPS·latency 언급이 없음도 확인 —
+  TCD/STSP/CSTA/ESSENTIAL과 같은 "시간을 안 잰다" 패턴이 다섯 번째 사례에서도 유지됨
+  (`paper_outline_draft.md` §2.1(e)).
+
+## 2026-09-28 · 이웃 구간 평균 거리 측정 — segment-level diff 그림 삭제
+
+**질문:** 논문은 "k=4에서는 이웃 구간 평균이 이미 비슷해서 diff 항이 더할 정보가 적다"고
+설명하고, 이를 화살표 굵기(k=3이 k=4의 2.6배)로 그린 그림(구 Figure 3)으로 보여줬다.
+캡션은 "not to scale"이라 적었을 뿐 실제로 잰 적은 없었다.
+`dev/measure_segment_neighbor_gap.py`(신규)로 diff ablation과 같은 SSv2 48클래스 feature,
+같은 `_segment_means`로 이웃 구간 평균 사이 거리를 쟀다
+([`segment_neighbor_gap_raw.json`](segment_neighbor_gap_raw.json)).
+
+| | k=3 | k=4 | k=4/k=3 |
+|---|---|---|---|
+| L2 (train 4,800 클립) | 0.311 | 0.297 | 0.955 |
+| 상대 거리 | 0.321 | 0.305 | 0.951 |
+| 코사인 | 0.943 | 0.948 | |
+| L2 (val 4,702 클립) | 0.301 | 0.287 | 0.955 |
+
+- **방향은 맞다** — k=4에서 이웃이 더 가깝고 train/val 모두 같은 비율.
+- **크기는 약 5%** — 그림의 2.6배 굵기 차이는 이를 크게 과장했다. diff 이득(Acc_last)
+  차이도 +0.66 대 +0.41pp로 작아 "작은 차이 → 작은 효과"와는 일관되지만, 인과는 이
+  측정만으로 증명되지 않는다(k=4+diff의 차원 3584도 후보 요인).
+- **결정:** 그림 삭제, 본문 Segment-level 문단에 측정값을 한 문장으로 넣음(세 원고).
+  논문 그림은 Figure 1(pooling), 2(구간 수 역U자), 3(정확도 vs fps) 세 개가 됨.

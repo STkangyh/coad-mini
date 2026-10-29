@@ -90,7 +90,7 @@ TCD 공개 저장소([bellos1203/TCD](https://github.com/bellos1203/TCD))에서 
 > "우리 baseline이 강하다"가 아니라 **"같은 frozen feature 위에서 backprop을 없애는 쪽이
 > 훨씬 낫다"**이며, 이 비교는 그것을 보여준다.
 
-## 발견 1 — 증분 크기에 완전히 불변 (구조적 성질)
+## 발견 1 — 증분 크기에 불변 (구조적 성질)
 
 | 방법 | 10×5 → 2×25 변화 |
 |---|---|
@@ -98,9 +98,18 @@ TCD 공개 저장소([bellos1203/TCD](https://github.com/bellos1203/TCD))에서 
 | FrameMaker | 78.13 → 75.77 (**−2.36**) |
 | ESSENTIAL | 95.1 → 93.3 (**−1.80**) |
 | STSP | 81.15 → 79.25 (−1.90, 비단조) |
-| **우리 (FeCAM)** | 88.84 → 88.84 (**0.00**) |
+| ST-Prompt | 84.75 → 85.67 (+0.92) |
+| **우리 (chunks3+adjdiff + FeCAM)** | 90.00 → 89.97 (**−0.03**) |
 
-세션을 잘게 쪼갤수록 다른 방법은 전부 열화하는데 **우리는 변화가 0.02%p 이내**다.
+세션을 잘게 쪼갤수록 다른 방법은 1–3pp 움직이는데 **우리는 Acc_avg가 −0.03pp**다.
+(mean pooling으로 했던 초기 값은 88.84 → 88.84, 0.00이었고, 헤드라인을 chunks3+adjdiff로
+바꾼 뒤 −0.03이 됐다.)
+
+**−0.03은 모델 차이가 아니다 (2026-10-03 확인).** 원시결과
+`ucf101_pooling_sweep_raw.json`에서 두 스케줄 이상이 거치는 모든 클래스 수(51, 61, 71,
+81, 91, 101)의 정확도가 세 스케줄·세 seed 모두 비트 단위로 동일하다(mean과
+chunks3+adjdiff 둘 다). 차이는 잘게 나눈 스케줄이 그 사이에 추가하는 평가 지점(6/11/26개)이
+Acc_avg 평균에 들어가서 생긴다. Acc_last는 세 스케줄 모두 88.61.
 NCM·SLDA도 마찬가지(0.09%p, 0.04%p).
 
 이유는 명확하다 — **클래스별 통계가 독립적으로 누적**되므로 "언제 몇 개씩 들어오는지"가
@@ -165,6 +174,33 @@ gradient 기반 방법(GRU+A-GEM)에는 같은 논리가 그대로 적용되지 
 논문에서는 이렇게 쓰면 된다 — *"appearance-discriminative한 행동에 대해서는
 학습 없는 통계 head가 무거운 학습 방법을 능가하며, motion-discriminative한 경우에는
 그렇지 않다. 우리는 그 경계를 정량화한다."*
+
+## 원문 대조 (2026-09-28) — 위 "문헌 대비 위치" 표의 출처
+
+위 표를 만든 7월 세션은 수치별 출처(어느 논문의 몇 번 표)를 남기지 않았다. 논문 Table 6에
+쓰는 6개 방법 × 3개 증분 설정 = 18개 값을 **각 원 논문 PDF의 표와 직접** 대조했다
+(CVF/NeurIPS/ECVA 공개판을 PDF.js로 텍스트 추출).
+
+| 방법 | 원 출처 | 원문 값 (10×5 / 5×10 / 2×25) | 논문에 쓰던 값 | 결과 |
+|---|---|---|---|---|
+| TCD | TCD, ICCV'21, Table 1 (UCF101, **CNN** 열) | 74.89 / 73.43 / 72.19 | 동일 | ✅ |
+| FrameMaker | FrameMaker, NeurIPS'22, Table 1 (CNN 열) | 78.13 / 76.38 / 75.77 | 동일 | ✅ |
+| STSP | STSP, ECCV'24, Table 1 | 81.15 / 82.84 / 79.25 | 동일 | ✅ |
+| ST-Prompt (CLIP) | ST-Prompt, ICCV'23, Table 1 (CLIP ViT-B/16 행) | **84.75 / 85.54 / 85.67** | 84.80 / 85.50 / 85.70 | ❌ 수정함 |
+| ESSENTIAL (CLIP) | ESSENTIAL, ICCV'25, Table 2 (TCD Benchmark) | 95.1 / 93.9 / 93.3 | 동일 | ✅ |
+
+- **ST-Prompt 오류 원인:** ESSENTIAL Table 2가 ST-Prompt를 소수 1자리로 반올림해 재인용
+  (84.8/85.5/85.7)했고, 그 값에 0을 붙여 옮겼다. 원 논문 값으로 교체했고, 연동된 값도 수정:
+  ST-Prompt 대비 격차 5.2→**5.3**pp, 불변성 표 +0.90→**+0.92**pp.
+- **CNN vs NME:** TCD·FrameMaker는 NME 분류기 값도 보고한다(TCD 77.16/75.35/74.01,
+  FrameMaker 78.64/78.14/77.49 — 둘 다 CNN보다 높음). STSP는 비교 대상을 CNN 값으로,
+  ESSENTIAL은 NME 값(TCD 77.2, FrameMaker 78.6)으로 인용한다 — 문헌 관례가 갈린다.
+  논문은 현재 CNN 값을 쓴다.
+- **캡션 사실 오류 2건 수정:** (1) FrameMaker exemplar를 "미공개"라 썼으나 원문은 "기존 방법과
+  같은 클래스당 메모리"를 명시(Table 9: 클래스당 영상 40개 × 압축 프레임 1장 = TCD의 영상 5개와
+  같은 6.0Mb). (2) ESSENTIAL 학습 GPU를 "24×RTX 3090"이라 썼으나 UCF101은 **8장**(arXiv판
+  구현 세부사항: "24 … GPUs for all datasets except UCF-101 and ActivityNet, where we use 8"),
+  UCF101 현재 태스크 학습도 50이 아니라 30 에폭.
 
 ## ⚠️ 정직한 caveat (논문에 반드시 병기)
 

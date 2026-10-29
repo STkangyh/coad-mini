@@ -11,7 +11,19 @@ it was assembled from three separate one-axis decisions.
 AXES
   backbone  clip_b32 (512-d)  vs  openclip_l14 (768-d)   -- both already extracted
   pooling   mean / chunks4 / chunks3_adjdiff             -- 1x / 4x / 5x dim
-  head      NCM / SLDA / Ridge-RLS / FeCAM               -- all backprop-free
+  head      NCM / SLDA / FeCAM                           -- all backprop-free
+
+Head choice is not arbitrary: it reuses the project's own established trio.
+cpu_friendly_methods_result.md's first generation compared NCM / SLDA / Ridge
+RLS; once FeCAM proved better on every metric, later comparisons
+(ssv2_head_curves_result.md, pycil_bridge_result.md) dropped Ridge and settled
+on NCM / SLDA / FeCAM. NCM alone skips covariance entirely; SLDA and FeCAM
+both use ONE shared covariance matrix, regularized differently, not "no
+regularization vs regularization" -- SLDA does isotropic shrinkage
+(shrink=1e-2 * I), FeCAM shrinks a correlation-normalized matrix with
+separate diagonal/off-diagonal constants (SHRINK_1=SHRINK_2=1.0), verified by
+reading both implementations rather than assumed. Ridge was added back here
+once without checking that history first; removed to match precedent.
 
 METRICS
   mAP     macro average precision over the full 48-way task.
@@ -69,7 +81,6 @@ BACKBONE_DIRS = {
                      "laion/CLIP-ViT-L-14-laion2B-s32B-b82K", 768),
 }
 POOLING_NAMES = ["mean", "chunks4", "chunks3_adjdiff"]
-RIDGE_LAMBDA = 1e2
 
 
 # ── heads, parameterized by dim (the repo's existing copies hardcode globals) ──
@@ -139,28 +150,6 @@ class SLDA:
         return s
 
 
-class Ridge:
-    """Recursive least squares / ACIL-style closed-form linear readout."""
-    name = "Ridge-RLS"
-
-    def __init__(self, dim):
-        self.dim = dim
-        self.G = np.zeros((dim, dim))
-        self.C = np.zeros((dim, N_CLASSES))
-        self._W = None
-
-    def observe(self, X, y):
-        Y = np.eye(N_CLASSES)[y]
-        self.G += X.T @ X
-        self.C += X.T @ Y
-        self._W = None
-
-    def scores(self, X):
-        if self._W is None:
-            self._W = np.linalg.solve(self.G + RIDGE_LAMBDA * np.eye(self.dim), self.C)
-        return X @ self._W
-
-
 class FeCAM:
     """The deployed head, at its served settings (few_shot_correction=True)."""
     name = "FeCAM"
@@ -176,7 +165,7 @@ class FeCAM:
         return self.h.scores(X)
 
 
-HEADS = [NCM, SLDA, Ridge, FeCAM]
+HEADS = [NCM, SLDA, FeCAM]
 
 
 # ── data ──────────────────────────────────────────────────────────────────────

@@ -1,30 +1,18 @@
 {
   "_meta": {
-    "generated_utc": "2026-08-02T02:27:59+00:00",
-    "git_commit": "6b5cfa85e28b990156412e17a6b9a1d0934d3016",
+    "generated_utc": "2026-08-09T04:47:42+00:00",
+    "git_commit": "f33163def0fc0c143c97093dfa58ee31da71ac6d",
     "git_branch": "feature/pycil-benchmarks",
     "dirty": true,
     "dirty_files": [
-      "enchmarks/pycil/run_analytic_cifar100.py",
-      "dev/bench_jetson.py",
-      "dev/bench_realtime_incremental.py",
-      "dev/run_base_heavy_split.py",
-      "dev/run_bounds_context.py",
-      "dev/run_ssv2_gru_curve.py",
-      "dev/run_ssv2_head_curves.py",
-      "dev/run_ssv2_pooling_protocol.py",
-      "dev/run_ssv2_temporal_pooling.py",
-      "dev/run_ucf101_gru_agem.py",
-      "dev/run_ucf101_tcd_protocol.py",
-      "reports/ssv2_head_curves_raw.json",
-      "reports/ssv2_temporal_pooling_raw.json",
-      "src/utils/provenance.py",
-      "tests/test_provenance.py"
+      "ev/run_ap_fps_sweep.py",
+      "reports/RESEARCH_LOG.md",
+      "reports/ap_fps_sweep_raw.json",
+      "reports/ap_fps_sweep_result.md",
+      "reports/assets_ap_fps_sweep.png"
     ],
     "script": "dev/run_ssv2_head_curves.py",
-    "argv": [
-      "--help"
-    ],
+    "argv": [],
     "env": {
       "python": "3.13.9",
       "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
@@ -47,7 +35,7 @@
     ],
     "avg_inc": 0.20889163627332752,
     "last": 0.12377711612079965,
-    "fit_s": 0.12658633315004408
+    "fit_s": 0.14933420903980732
   },
   "Deep SLDA": {
     "per_step": [
@@ -62,7 +50,7 @@
     ],
     "avg_inc": 0.2277443272230379,
     "last": 0.141429179072735,
-    "fit_s": 0.18526812479831278
+    "fit_s": 0.2295863749459386
   },
   "FeCAM (shared cov)": {
     "per_step": [
@@ -77,6 +65,6 @@
     ],
     "avg_inc": 0.24192441497020198,
     "last": 0.15737983836665248,
-    "fit_s": 0.37688595801591873
+    "fit_s": 0.37926054187119007
   }
 }
