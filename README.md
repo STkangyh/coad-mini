@@ -3,102 +3,104 @@
 [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/Yhoon-3/coad-mini)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-2ea44f?logo=github)](https://stkangyh.github.io/coad-mini/)
 
-**▶ [Try the live demo](https://yhoon-3-coad-mini.hf.space)** — webcam realtime captioning · few-shot action enrollment · OOD detection.
+**▶ [Try the live demo](https://yhoon-3-coad-mini.hf.space)** · **[Project page](https://stkangyh.github.io/coad-mini/)** · **[Research log](reports/RESEARCH_LOG.md)**
 
-Compact continual-learning experiments for video action recognition on a 48-class subset of Something-Something V2. The project compares a plain sequential baseline against replay-based mitigation methods, mainly **A-GEM**, using **CLIP ViT-B/32 frame features** and a **GRU classifier**.
+Class-incremental video action recognition that runs on a CPU without backpropagation. A frozen CLIP ViT-B/32
+encoder, an **order-preserving temporal pooling** and a closed-form **FeCAM** covariance head learn new action
+classes by updating running statistics: no gradient steps, no stored exemplars, real-time on a laptop CPU.
 
-![Demo — Baseline vs A-GEM realtime captioning](docs/assets/demo.gif)
+```
+video -> 16 frames -> frozen CLIP ViT-B/32 (512-d per frame)
+      -> order-preserving pooling: k segment means (+ adjacent differences)
+      -> FeCAM head: per-class running mean + shared covariance, Mahalanobis scoring
+```
 
-> *Realtime captioning demo: **Baseline** (left, red) vs **A-GEM** (right, green) on Something-Something V2, with a live OOD score. A-GEM correctly recognizes actions the sequentially-trained baseline mislabels (e.g. "Folding paper").*
+## Results
 
-> **📓 연구 일지 (Research Log)** — 실험 설계부터 최종 결과까지, 코드에 담기지 않은 의사결정 과정을 기록했습니다.  
-> OrthGrad 가설 → 실패 → A-GEM 전환 → Scaling → Ablation → Demo 까지의 흐름을 담고 있습니다.  
-> → **[docs/research_log.md](docs/research_log.md)**
+**UCF101, TCD protocol** (51 base classes, average incremental accuracy %, 3 seeds). Competitor numbers are each
+paper's own reported results.
 
-## What this repository contains
+| Method | Exemplars | Trained on UCF101 | 10×5 | 5×10 | 2×25 |
+|---|---|---|--:|--:|--:|
+| TCD (ICCV'21) | 5 videos / class | TSM backbone, fine-tuned | 74.89 | 73.43 | 72.19 |
+| FrameMaker (NeurIPS'22) | 40 condensed frames / class | TSM backbone, fine-tuned | 78.13 | 76.38 | 75.77 |
+| STSP (ECCV'24) | 0 | TSM backbone, null-space projected | 81.15 | 82.84 | 79.25 |
+| ST-Prompt (ICCV'23) | 0 | space-time prompts, CLIP frozen | 84.75 | 85.54 | 85.67 |
+| **coad-mini** | **0** | **nothing (closed-form head)** | **90.00** | **89.99** | **89.97** |
+| ESSENTIAL (ICCV'25) | sparse frame features | temporal encoder + retrieval, 8×RTX 3090 | 95.1 | 93.9 | 93.3 |
 
-- **Training scripts** for baseline sequential learning, stage-wise continual learning, and multi-seed analysis
-- **A FastAPI demo app** for comparing Baseline vs A-GEM predictions on uploaded videos
-- **Few-shot enrollment** of brand-new action classes (48 → 48+K) without catastrophic forgetting — see [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md)
-- **Anomaly / novel-action (OOD) detection** on the prediction stream — see [docs/anomaly_detection.md](docs/anomaly_detection.md)
-- **Saved checkpoints** for the 48-class setup
-- **Mini subset manifests** used by the experiments
+- **Invariant to increment size.** From 10×5 to 2×25 the other methods move by −2.70 to +0.92pp; this one moves
+  −0.03pp. At every class count the schedules share, accuracy is bit-identical across schedules and seeds (final
+  accuracy 88.61 in all cases); the residual comes only from the extra evaluation points a finer schedule averages over.
+- **Order-preserving pooling closes much of the motion gap.** On Something-Something V2, segment pooling raises final
+  accuracy from 15.74 to 24.71 (48-class subset) and from 11.74 to 18.50 (standard 174-class split). Selecting the
+  variant on held-out data gives +7.83pp; any order-preserving variant adds 7–9pp over mean pooling.
+- **Real time on a CPU.** Enrolling and predicting together runs at 39.4 fps on an Apple M4 CPU (10 fps budget).
+  A closed-form fit takes 42.4 ms per session against 270 s for a GRU fine-tune.
+- **Known limit.** On SSv2's 174-class split ESSENTIAL reaches 48.9% against our 21.17%: a trained temporal encoder
+  still extracts motion that closed-form pooling does not.
 
-## Applications
+Every number links back to a script in `dev/` and a raw JSON result in `reports/`, stamped with the commit that
+produced it. Start with [reports/RESEARCH_LOG.md](reports/RESEARCH_LOG.md), which also lists every claim we later
+corrected.
 
-All reuse the same `CLIP features → GRU → A-GEM` core and are **wired into the FastAPI demo UI** (`GET /`):
+## Demo app
 
-- **Realtime captioning** — streaming per-window action prediction overlaid on an **uploaded video or a live webcam** (`POST /predict_rt`).
-- **Anomaly / novel-action (OOD) detection** — an OOD-score badge on the realtime stream (turns red when an action looks out-of-distribution). Scoring (max-softmax-prob / entropy / energy) uses one convention — **higher score == more OOD** — with a calibrated threshold + temporal smoothing (`POST /predict_anomaly`). Calibrate: `python3 experiments/calibrate_anomaly.py --metric energy --target-fpr 0.05`. Details: [docs/anomaly_detection.md](docs/anomaly_detection.md).
-- **Few-shot enrollment (continual-learning loop)** — a UI panel (label + example videos) registers a brand-new action class (48 → 48+K) via A-GEM replay without catastrophic forgetting, then **hot-swaps the serving model so the new action appears in the live caption immediately** and persists across restarts. Manage/reset enrolled actions via `GET /classes` · `POST /reset_classes` (`POST /enroll`). Demo: `python3 experiments/demo_few_shot.py`. Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
+`uvicorn app:app --port 8000` (or the included `Dockerfile`, Hugging Face Spaces-ready; see [docs/DEPLOY.md](docs/DEPLOY.md)).
+The served head is FeCAM with `chunks4` pooling (`checkpoints/fecam_head.npz`, rebuilt by `dev/build_fecam_head.py`).
 
-**Run the live demo:** `uvicorn app:app --port 8000`, or containerized via the included `Dockerfile` (Hugging Face Spaces-ready). See [docs/DEPLOY.md](docs/DEPLOY.md).
+- **Realtime captioning** on an uploaded video or a live webcam (`POST /predict_rt`).
+- **Few-shot enrollment**: add a new action from a few clips; it appears in the live stream immediately and persists
+  across restarts (`POST /enroll`, `GET /classes`, `POST /reset_classes`). Details: [docs/few_shot_enrollment.md](docs/few_shot_enrollment.md).
+- **Out-of-distribution score** on the stream with a calibrated threshold (`POST /predict_anomaly`). Details:
+  [docs/anomaly_detection.md](docs/anomaly_detection.md).
 
-## Key findings
+The app still serves the earlier GRU baseline and GRU + A-GEM models side by side for comparison.
 
-After A-GEM converged, we searched for the next bottleneck. **Data quantity dominates — not architecture:**
+## Reproducing the main numbers
 
-![What actually moves the needle](docs/assets/fig_levers.png)
-![Data-scaling curve: CLIP B/32 vs OpenCLIP L/14](docs/assets/fig_data_scale.png)
-
-| Lever | Effect on Avg Acc |
+| Result | Script |
 |---|---|
-| GRU capacity (256→512, +layers) | none / worse |
-| Memory strategy (balanced/hard) | none |
-| Backbone CLIP B/32 → OpenCLIP L/14 | +0.01–0.026 (vanishes at full data) |
-| GRU → GRU+Attention | **−0.103** (forgetting +0.240) |
-| **Training data 25% → 100%** | **+0.06–0.07** (still rising) |
+| UCF101 TCD protocol, pooling sweep | `dev/run_ucf101_pooling_sweep.py` |
+| SSv2 174-class split | `dev/run_ssv2_tcd_174_pooling.py` |
+| SSv2 pooling selection on held-out data | `dev/run_ssv2_pooling_protocol.py` |
+| Difference-term ablation | `dev/run_diff_ablation.py` |
+| Realtime enrol + predict throughput | `dev/bench_realtime_incremental.py` |
+| Pooling × head accuracy / fps sweep | `dev/run_ap_fps_sweep.py` |
+| FLOPs accounting | `dev/compute_flops.py` |
 
-Conclusion: a **simple GRU + A-GEM is the robust optimum**; scale data, not architecture. Reports: [openclip_l14](reports/openclip_l14_result.md) · [gru_attention](reports/gru_attention_result.md) · [data_scale](reports/data_scale_result.md). Full narrative: [docs/research_log.md](docs/research_log.md) §11.
+## History
 
-That conclusion is where the project *started*, not where it ended: dropping backprop entirely
-turned out to beat it on every metric, and the served model is now a FeCAM head on frozen CLIP.
-The whole arc, dated experiment by experiment, is in
-**[reports/RESEARCH_LOG.md](reports/RESEARCH_LOG.md)** — start there.
-
-## Method overview
-
-The pipeline is:
-
-`video -> 16 uniformly sampled frames -> CLIP ViT-B/32 embeddings -> GRU classifier -> staged continual-learning evaluation`
-
-Current default setup:
-
-- **48 classes**
-- **8 stages x 6 classes**
-- **16 sampled frames per video**
-- **512-dim CLIP visual features**
+The project began as GRU + A-GEM continual learning on a 48-class SSv2 subset (June 2026). Capacity, a larger
+backbone, attention and state-space models did not improve it; only more data did
+([data_scale](reports/data_scale_result.md), [gru_attention](reports/gru_attention_result.md),
+[docs/research_log.md](docs/research_log.md)). Removing backprop entirely then beat it on every metric, which is
+where the current method comes from.
 
 ## Repository layout
 
 ```text
 coad-mini/
-├── app.py                      # FastAPI demo server
-├── config.py                   # Shared constants and path configuration
-├── experiments/                # Training and analysis scripts
-│   ├── train_baseline.py       # Single-pass baseline training
-│   ├── train_stage.py          # Stage-based continual learning comparison
-│   ├── run_stage_seeds.py      # Multi-seed baseline vs A-GEM
-│   ├── run_capacity_ablation.py# Capacity / backbone / GRU+Attention sweep
-│   ├── run_data_scale.py       # Data-fraction scaling (B/32 vs L/14)
-│   ├── run_analysis.py         # A-GEM replay/memory ablations
-│   ├── demo_few_shot.py        # Few-shot enrollment demo
-│   ├── calibrate_anomaly.py    # Anomaly-score threshold calibration
-│   └── save_checkpoints.py     # Train and save Baseline/A-GEM checkpoints
-├── src/                        # Core library code
+├── app.py                  # FastAPI demo server (FeCAM head + GRU/A-GEM for comparison)
+├── config.py               # Shared constants and path configuration
+├── src/
 │   ├── models/
-│   │   ├── gru_detector.py
-│   │   └── gru_attention.py    # GRU + MultiheadAttention temporal model
-│   ├── enroll/few_shot.py      # Few-shot new-class enrollment (A-GEM)
-│   ├── anomaly/detector.py     # OOD / anomaly scoring
-│   ├── utils/{gem.py, orthogonal_grad.py}
-│   └── trainer.py              # Shared train/eval loops
-├── tests/                      # pytest suites for the modules above
-├── scripts/                    # Data preparation + feature extraction
-├── docs/                       # GitHub Pages site + research log + module docs
-├── reports/                    # Experiment result reports
-├── checkpoints/                # baseline_48cls.pt, agem_48cls.pt, class_labels.json
-└── data/subset/                # train_mini.json, val_mini.json
+│   │   ├── fecam_head.py   # Closed-form FeCAM head + temporal pooling variants
+│   │   ├── gru_detector.py # Earlier GRU classifier
+│   │   └── gru_attention.py, ssm_detector.py
+│   ├── enroll/few_shot.py  # Few-shot enrollment
+│   ├── anomaly/detector.py # OOD scoring
+│   ├── utils/              # A-GEM, provenance stamping of result files
+│   └── trainer.py
+├── dev/                    # Benchmark and analysis scripts behind the results
+├── benchmarks/pycil/       # CIFAR-100 cross-check on PyCIL splits
+├── experiments/            # Earlier GRU / A-GEM training scripts
+├── static/index.html       # Demo UI
+├── tests/                  # pytest suites (run in CI)
+├── scripts/                # Data preparation + feature extraction
+├── docs/                   # GitHub Pages site and module docs
+├── reports/                # Result reports, raw JSON, RESEARCH_LOG.md
+└── checkpoints/            # fecam_head.npz, baseline_48cls.pt, agem_48cls.pt, class_labels.json
 ```
 
 ## Requirements
@@ -147,6 +149,8 @@ Endpoints:
 - `GET /classes` - list base + enrolled classes
 - `POST /reset_classes` - remove enrolled actions, revert to the base 48
 
+Responses include the FeCAM head's prediction under `fecam` next to the GRU models' predictions.
+
 ### 2. Recreate the mini subset manifests
 
 ```bash
@@ -162,9 +166,13 @@ python3 scripts/extract_clip_features.py
 
 This writes per-video features under `data/features/{train,val}`.
 
-### 4. Run experiments
+### 4. Build the FeCAM head and run benchmarks
 
 ```bash
+# Rebuild the served FeCAM head (pooling is stored in the checkpoint)
+python3 dev/build_fecam_head.py chunks4
+
+# Earlier GRU / A-GEM experiments
 # Simple baseline run
 python3 experiments/train_baseline.py
 
@@ -200,5 +208,5 @@ If you plan to publish the repository, commit the code and lightweight metadata,
 
 ## Notes
 
-- The project currently contains both **A-GEM** and an older **OrthGrad / COAD** variant. The demo app and saved checkpoints focus on **Baseline vs A-GEM**.
-- Training scripts expect the mini subset JSON files and extracted features to exist under `data/`.
+- The served model is the FeCAM head. The GRU baseline, GRU + A-GEM and the older OrthGrad / COAD variant remain in the repository as the project's earlier stages.
+- Training and benchmark scripts expect the mini subset JSON files and extracted features to exist under `data/`.
