@@ -2,7 +2,7 @@
 
 Generated: 2026-08-21. 스크립트: [`dev/run_overlap_pooling.py`](../dev/run_overlap_pooling.py)
 (신규) · 원시결과: `reports/overlap_pooling_raw.json`
-배경: [`paper_outline_draft.md`](paper_outline_draft.md) 상단 "⚠️ 먼저 결정해야 할 것 — overlap"
+배경: `paper_outline_draft.md`(원고 작업 파일, 저장소 미포함) 상단 "⚠️ 먼저 결정해야 할 것 — overlap"
 (Notion 개요에 "overlap이 중요"·"overlap 유무" ablation이 있었으나 구현이 없었음)
 
 **질문:** `src/models/fecam_head.py`의 `_segment_means(w, k)`는 항상 **비중첩** 구간으로만

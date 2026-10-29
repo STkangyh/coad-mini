@@ -3,7 +3,7 @@ Order-preserving pooling on the LITERAL TCD 174-class SSv2 split.
 
 Why this exists
 ---------------
-The paper (reports/paper/paper_draft.tex) tabulates the TCD/STSP/CSTA/ESSENTIAL
+The paper (manuscript kept outside this repository) tabulates the TCD/STSP/CSTA/ESSENTIAL
 lineage on SSv2's standard 174-class split (Table 1, `tab:tcd-lineage`) but
 reports its OWN numbers on a self-defined 48-class curriculum. A reviewer who
 reads that table will ask why we do not report on the split we just tabulated.

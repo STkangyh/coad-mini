@@ -61,3 +61,4 @@ reports/paper/*.fdb_latexmk
 reports/paper/
 reports/paper_outline_draft.md
 dev/make_paper_figures.py
+reports/experimental_setup_section.md

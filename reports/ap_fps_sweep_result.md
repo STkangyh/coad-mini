@@ -58,7 +58,7 @@ pooling해서 채점한다. `fps = 1000 / (encode_1frame_ms + pool_ms + head_sco
 | chunks4(배포) | 16.38% | 21.78% | **23.56%** | 39.92 |
 | chunks3+adjdiff | 18.42% | 22.50% | **24.71%** | 39.38 |
 
-![mAP vs fps 9조합 산점도, 점마다 fps 라벨 표시 -- FeCAM(파랑)이 3개 pooling 전부에서 가장 위, NCM(청록) 최하위](paper/images/assets_ap_fps_sweep_accuracy.png)
+![mAP vs fps 9조합 산점도, 점마다 fps 라벨 표시 -- FeCAM(파랑)이 3개 pooling 전부에서 가장 위, NCM(청록) 최하위](assets_ap_fps_sweep_accuracy.png)
 
 **FeCAM > SLDA > NCM 순서가 3개 pooling 전부에서 예외 없이 유지된다** — 왜 이 순서가
 나오는지는 §6에서 별도로 짚는다.

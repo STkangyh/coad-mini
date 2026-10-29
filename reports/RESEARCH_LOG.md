@@ -965,8 +965,8 @@ JSON으로 떨구는 단일 스크립트를 미리 만들어 둘 것.
 | 08-05 | [partial_window_sim_result.md](partial_window_sim_result.md) |
 | 08-06 | [ssv2_video_access_result.md](ssv2_video_access_result.md) · [ap_fps_sweep_result.md](ap_fps_sweep_result.md) |
 | 08-08 | [ssv2_head_curves_result.md](ssv2_head_curves_result.md)(스크립트는 08-02 작성, 리포트는 뒤늦게 정리) · [fecam_vs_slda_covariance_result.md](fecam_vs_slda_covariance_result.md) · [ssv2_accuracy_interpretation_result.md](ssv2_accuracy_interpretation_result.md) · [essential_trained_module_edge_feasibility_result.md](essential_trained_module_edge_feasibility_result.md) · [recent_cpu_only_cl_survey_2026_result.md](recent_cpu_only_cl_survey_2026_result.md) · [hdc_comparison_result.md](hdc_comparison_result.md) |
-| 08-20 | [experimental_setup_section.md](experimental_setup_section.md)(논문 §4.1용 데이터·하이퍼파라미터·지표 정의) |
-| 08-21 | [paper_outline_draft.md](paper_outline_draft.md)(Notion 개요 빈 칸을 기존 리포트 근거로 채운 초안) · [overlap_pooling_result.md](overlap_pooling_result.md)(구간 overlap 시도 — 음성 결과, 채택 안 함) |
+| 08-20 | `experimental_setup_section.md`(원고 작업 파일, 저장소 미포함 · 논문 §4.1용 데이터·하이퍼파라미터·지표 정의) |
+| 08-21 | `paper_outline_draft.md`(원고 작업 파일, 저장소 미포함 · Notion 개요 빈 칸을 기존 리포트 근거로 채운 초안) · [overlap_pooling_result.md](overlap_pooling_result.md)(구간 overlap 시도 — 음성 결과, 채택 안 함) |
 | 08-23 | [sota_positioning_brief.md](sota_positioning_brief.md)(TCD 계열 표에 CIVC 추가) · `paper_outline_draft.md` 대폭 갱신(CIVC·CSTA 원문 재확인, diff ablation §3.4 신설, Method를 3.1 Problem Formulation/3.2 FeCAM/3.3 Order-Preserving Pooling/3.4 Adjacent Diff로 재구조화, space complexity 재표현) |
 
 ---
