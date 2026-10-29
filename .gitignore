@@ -56,3 +56,8 @@ reports/paper/*.bbl
 reports/paper/*.blg
 reports/paper/*.fls
 reports/paper/*.fdb_latexmk
+
+# paper manuscript and its figure tooling are kept out of the repository
+reports/paper/
+reports/paper_outline_draft.md
+dev/make_paper_figures.py
