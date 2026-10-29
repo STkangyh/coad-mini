@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "generated_utc": "2026-09-28T14:33:14+00:00",
+    "git_commit": "537826e2334a758dbf0f848834c600b94b2d643f",
+    "git_branch": "feature/pycil-benchmarks",
+    "dirty": true,
+    "dirty_files": [
+      "gitignore",
+      "dev/run_ssv2_tcd_174_pooling.py",
+      "reports/ap_fps_sweep_result.md",
+      "reports/assets_ap_fps_sweep.png",
+      "reports/assets_diff_diagram.png",
+      "reports/assets_diff_diagram_frame.png",
+      "reports/cas-common.sty -> reports/paper/cas-common.sty",
+      "reports/cas-dc.cls -> reports/paper/cas-dc.cls",
+      "reports/assets_ap_fps_sweep_accuracy.png -> reports/paper/images/assets_ap_fps_sweep_accuracy.png",
+      "reports/assets_diff_diagram_segment.png -> reports/paper/images/assets_diff_diagram_segment.png",
+      "reports/assets_pooling_diagram.png -> reports/paper/images/assets_pooling_diagram.png",
+      "reports/assets_segment_count_inverted_u.png -> reports/paper/images/assets_segment_count_inverted_u.png",
+      "reports/paper_draft.tex -> reports/paper/paper_draft.tex",
+      "reports/paper_draft_ko.tex -> reports/paper/paper_draft_ko.tex",
+      "reports/paper_neurocomputing.tex -> reports/paper/paper_neurocomputing.tex",
+      "reports/references.bib -> reports/paper/references.bib",
+      "reports/paper_outline_draft.md",
+      "reports/ucf101_tcd_result.md",
+      "dev/make_paper_figures.py",
+      "dev/measure_segment_neighbor_gap.py"
+    ],
+    "script": "dev/measure_segment_neighbor_gap.py",
+    "argv": [],
+    "env": {
+      "python": "3.14.0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "numpy": "2.4.3",
+      "torch": "2.11.0"
+    }
+  },
+  "features": "data/features",
+  "ks": [
+    3,
+    4
+  ],
+  "results": {
+    "train|k3": {
+      "pairs": 9600,
+      "l2_mean": 0.31096726655960083,
+      "l2_std": 0.1058233305811882,
+      "rel_mean": 0.32087692618370056,
+      "rel_std": 0.11117758601903915,
+      "cos_mean": 0.9425686606143912,
+      "cos_std": 0.04095925985114104
+    },
+    "train|k4": {
+      "pairs": 14400,
+      "l2_mean": 0.29708200693130493,
+      "l2_std": 0.1050172969698906,
+      "rel_mean": 0.3051798939704895,
+      "rel_std": 0.10995739698410034,
+      "cos_mean": 0.9475807677002417,
+      "cos_std": 0.038551796750332275
+    },
+    "val|k3": {
+      "pairs": 9404,
+      "l2_mean": 0.30083197355270386,
+      "l2_std": 0.10538050532341003,
+      "rel_mean": 0.30980709195137024,
+      "rel_std": 0.11038246005773544,
+      "cos_mean": 0.946146903210171,
+      "cos_std": 0.039599355098818755
+    },
+    "val|k4": {
+      "pairs": 14106,
+      "l2_mean": 0.28725874423980713,
+      "l2_std": 0.106424480676651,
+      "rel_mean": 0.29460427165031433,
+      "rel_std": 0.1110667884349823,
+      "cos_mean": 0.950624459418239,
+      "cos_std": 0.038361488976223865
+    }
+  }
+}

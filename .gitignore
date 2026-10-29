@@ -46,9 +46,13 @@ data/features_ucf101_live_cache.npz
 data/features_ssv2_live_cache.npz
 
 # LaTeX build artifacts (paper drafts)
-reports/build_nc/
-reports/*.aux
-reports/*.out
-reports/*.synctex.gz
-reports/*.log
-reports/paper_draft_ko.pdf
+reports/paper/build/
+reports/paper/*.aux
+reports/paper/*.out
+reports/paper/*.synctex.gz
+reports/paper/*.log
+reports/paper/*.pdf
+reports/paper/*.bbl
+reports/paper/*.blg
+reports/paper/*.fls
+reports/paper/*.fdb_latexmk

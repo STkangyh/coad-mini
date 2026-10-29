@@ -1015,3 +1015,26 @@ diff 유무만 바꿔 4개 변형을 동일 프로토콜로 실행했다
 - CIVC 원문 전체를 재검색해도 wall-clock·FPS·latency 언급이 없음도 확인 —
   TCD/STSP/CSTA/ESSENTIAL과 같은 "시간을 안 잰다" 패턴이 다섯 번째 사례에서도 유지됨
   (`paper_outline_draft.md` §2.1(e)).
+
+## 2026-09-28 · 이웃 구간 평균 거리 측정 — segment-level diff 그림 삭제
+
+**질문:** 논문은 "k=4에서는 이웃 구간 평균이 이미 비슷해서 diff 항이 더할 정보가 적다"고
+설명하고, 이를 화살표 굵기(k=3이 k=4의 2.6배)로 그린 그림(구 Figure 3)으로 보여줬다.
+캡션은 "not to scale"이라 적었을 뿐 실제로 잰 적은 없었다.
+`dev/measure_segment_neighbor_gap.py`(신규)로 diff ablation과 같은 SSv2 48클래스 feature,
+같은 `_segment_means`로 이웃 구간 평균 사이 거리를 쟀다
+([`segment_neighbor_gap_raw.json`](segment_neighbor_gap_raw.json)).
+
+| | k=3 | k=4 | k=4/k=3 |
+|---|---|---|---|
+| L2 (train 4,800 클립) | 0.311 | 0.297 | 0.955 |
+| 상대 거리 | 0.321 | 0.305 | 0.951 |
+| 코사인 | 0.943 | 0.948 | |
+| L2 (val 4,702 클립) | 0.301 | 0.287 | 0.955 |
+
+- **방향은 맞다** — k=4에서 이웃이 더 가깝고 train/val 모두 같은 비율.
+- **크기는 약 5%** — 그림의 2.6배 굵기 차이는 이를 크게 과장했다. diff 이득(Acc_last)
+  차이도 +0.66 대 +0.41pp로 작아 "작은 차이 → 작은 효과"와는 일관되지만, 인과는 이
+  측정만으로 증명되지 않는다(k=4+diff의 차원 3584도 후보 요인).
+- **결정:** 그림 삭제, 본문 Segment-level 문단에 측정값을 한 문장으로 넣음(세 원고).
+  논문 그림은 Figure 1(pooling), 2(구간 수 역U자), 3(정확도 vs fps) 세 개가 됨.
